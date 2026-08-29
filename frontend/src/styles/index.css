@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * Design tokens from design.md 1.3. Light mode is the base; the dark palette
+ * covers the staff-facing dashboards, which are used in low-light front-desk
+ * setups (design.md 1.3, flagged there as a recommendation).
+ */
+:root {
+  --color-bg: #f7f8fa;
+  --color-surface: #ffffff;
+  --color-border: #e4e7ec;
+  --color-text-primary: #0f1728;
+  --color-text-secondary: #5b6472;
+  --color-text-muted: #8a93a2;
+  --color-accent: #2a5ce0;
+  --color-accent-hover: #2148b8;
+  --color-success: #1a9e6b;
+  --color-warning: #c77b10;
+  --color-danger: #d23b3b;
+  --color-neutral: #6b7280;
+}
+
+:root[data-theme='dark'] {
+  --color-bg: #12151c;
+  --color-surface: #181c25;
+  --color-border: #262b36;
+  --color-text-primary: #e8ebf0;
+  --color-text-secondary: #a3abb9;
+  --color-text-muted: #79828f;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* design.md 1.4: times, prices and counts align in columns. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* design.md 3.7: every interactive element has a visible focus ring. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
