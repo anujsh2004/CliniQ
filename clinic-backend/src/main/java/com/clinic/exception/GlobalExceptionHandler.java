@@ -8,6 +8,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -76,6 +78,23 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleUnreadableBody(HttpMessageNotReadableException ex) {
         log.debug("Unreadable request body: {}", ex.getMessage());
         return validationError(List.of(new FieldErrorDetail("body", "Request body is missing or malformed")));
+    }
+
+    /**
+     * A @PreAuthorize denial is thrown inside the controller, past the point
+     * where the security filter chain's AccessDeniedHandler would see it, so it
+     * has to be mapped here or it would surface as a 500.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
+        ErrorCode code = ErrorCode.UNAUTHORIZED_ACCESS;
+        return ResponseEntity.status(code.status()).body(ErrorResponse.of(code, code.defaultMessage()));
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleAuthentication(AuthenticationException ex) {
+        ErrorCode code = ErrorCode.INVALID_CREDENTIALS;
+        return ResponseEntity.status(code.status()).body(ErrorResponse.of(code, code.defaultMessage()));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
