@@ -1,0 +1,33 @@
+# Build output
+target/
+build/
+dist/
+*.jar
+*.war
+
+# Node / frontend
+node_modules/
+.vite/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+application-local.yml
+application-local.properties
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
