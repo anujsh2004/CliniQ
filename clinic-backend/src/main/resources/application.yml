@@ -3,7 +3,7 @@ spring:
     name: clinic-backend
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5433/clinicdb}
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/clinic_db}
     username: ${DB_USERNAME:clinic_user}
     password: ${DB_PASSWORD:clinic_pass}
     driver-class-name: org.postgresql.Driver

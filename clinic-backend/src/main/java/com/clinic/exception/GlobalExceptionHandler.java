@@ -13,7 +13,10 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Comparator;
 import java.util.List;
@@ -70,13 +73,38 @@ public class GlobalExceptionHandler {
         return validationError(List.of(new FieldErrorDetail("body", "Request body is missing or malformed")));
     }
 
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleUnknownRoute(NoResourceFoundException ex) {
+        return transportError(HttpStatus.NOT_FOUND, "Requested resource was not found");
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotAllowed(HttpRequestMethodNotSupportedException ex) {
+        return transportError(HttpStatus.METHOD_NOT_ALLOWED, "HTTP method is not supported for this resource");
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException ex) {
+        return transportError(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Content type is not supported");
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception ex) {
         // Never leak internals (API contract 6): log the detail, return a generic message.
         log.error("Unhandled exception", ex);
-        ErrorResponse body = new ErrorResponse(false, "Something went wrong. Please try again.", null,
-                List.of(), java.time.OffsetDateTime.now(), com.clinic.config.RequestIdFilter.currentRequestId());
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+        return transportError(HttpStatus.INTERNAL_SERVER_ERROR, "Something went wrong. Please try again.");
+    }
+
+    /**
+     * Envelope for transport-level failures (unknown route, wrong method,
+     * unsupported media type, unexpected error). The contract's ErrorCode enum
+     * covers domain failures only, so errorCode is omitted here rather than
+     * inventing a value outside section 7a.
+     */
+    private ResponseEntity<ErrorResponse> transportError(HttpStatus status, String message) {
+        ErrorResponse body = new ErrorResponse(false, message, null, List.of(),
+                java.time.OffsetDateTime.now(), com.clinic.config.RequestIdFilter.currentRequestId());
+        return ResponseEntity.status(status).body(body);
     }
 
     private ResponseEntity<ErrorResponse> validationError(List<FieldErrorDetail> details) {
