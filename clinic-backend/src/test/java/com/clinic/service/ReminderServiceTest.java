@@ -151,7 +151,7 @@ class ReminderServiceTest {
     }
 
     @Test
-    void doesNotQueueTheSameReminderTwice() {
+    void doesNotSendAnAlreadyDeliveredReminderAgain() {
         // The sweep runs hourly; a patient must not be messaged once an hour.
         Appointment appointment = appointment(LocalDate.now().plusDays(1), LocalTime.of(10, 0),
                 AppointmentStatus.CONFIRMED);
@@ -169,6 +169,55 @@ class ReminderServiceTest {
         assertThat(response.status()).isEqualTo(NotificationStatus.SENT);
         verify(notificationRepository, never()).saveAndFlush(any());
         verify(publisher, never()).publish(any());
+    }
+
+    @Test
+    void republishesAReminderThatIsStillQueued() {
+        // The record exists but the message never got through - broker down, or
+        // the message was lost. Returning the record unchanged would leave a
+        // reminder that can never arrive, so it is published again.
+        Appointment appointment = appointment(LocalDate.now().plusDays(1), LocalTime.of(10, 0),
+                AppointmentStatus.CONFIRMED);
+        Notification stuck = new Notification();
+        stuck.setId(UUID.randomUUID());
+        stuck.setStatus(NotificationStatus.QUEUED);
+        stuck.setChannel(NotificationChannel.WHATSAPP);
+        stuck.setReminderType(ReminderService.REMINDER_24_HOURS);
+        when(appointmentRepository.findWithDetailsById(appointment.getId()))
+                .thenReturn(Optional.of(appointment));
+        when(notificationRepository.findByAppointmentIdAndReminderType(
+                appointment.getId(), ReminderService.REMINDER_24_HOURS))
+                .thenReturn(Optional.of(stuck));
+
+        var response = service.queueReminder(requestFor(appointment));
+
+        assertThat(response.status()).isEqualTo(NotificationStatus.QUEUED);
+        verify(publisher).publish(any(ReminderMessage.class));
+        // No second record: the existing one is reused.
+        verify(notificationRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void retriesAReminderThatPreviouslyFailed() {
+        Appointment appointment = appointment(LocalDate.now().plusDays(1), LocalTime.of(10, 0),
+                AppointmentStatus.CONFIRMED);
+        Notification failed = new Notification();
+        failed.setId(UUID.randomUUID());
+        failed.setStatus(NotificationStatus.FAILED);
+        failed.setFailureReason("provider returned 503");
+        failed.setChannel(NotificationChannel.WHATSAPP);
+        failed.setReminderType(ReminderService.REMINDER_24_HOURS);
+        when(appointmentRepository.findWithDetailsById(appointment.getId()))
+                .thenReturn(Optional.of(appointment));
+        when(notificationRepository.findByAppointmentIdAndReminderType(
+                appointment.getId(), ReminderService.REMINDER_24_HOURS))
+                .thenReturn(Optional.of(failed));
+
+        var response = service.queueReminder(requestFor(appointment));
+
+        assertThat(response.status()).isEqualTo(NotificationStatus.QUEUED);
+        assertThat(failed.getFailureReason()).isNull();
+        verify(publisher).publish(any(ReminderMessage.class));
     }
 
     @Test

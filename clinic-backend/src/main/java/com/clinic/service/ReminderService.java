@@ -69,8 +69,23 @@ public class ReminderService {
         var existing = notificationRepository
                 .findByAppointmentIdAndReminderType(appointment.getId(), reminderType);
         if (existing.isPresent()) {
-            return new NotificationQueuedResponse(existing.get().getId().toString(),
-                    existing.get().getStatus());
+            Notification found = existing.get();
+            // Already delivered: leave it alone, so a patient is never messaged
+            // twice.
+            if (found.getStatus() == NotificationStatus.SENT
+                    || found.getStatus() == NotificationStatus.DELIVERED) {
+                return new NotificationQueuedResponse(found.getId().toString(), found.getStatus());
+            }
+            // Still QUEUED or FAILED: the record exists but the message never
+            // got through - the broker was down, the message was lost, or
+            // delivery exhausted its retries. Republish rather than returning a
+            // reminder that will never arrive. The worker skips anything
+            // already sent, so a duplicate publish is harmless.
+            found.setStatus(NotificationStatus.QUEUED);
+            found.setFailureReason(null);
+            notificationRepository.save(found);
+            publisher.publish(messageFor(appointment, found));
+            return new NotificationQueuedResponse(found.getId().toString(), found.getStatus());
         }
 
         Notification notification = new Notification();
@@ -93,8 +108,18 @@ public class ReminderService {
                     .orElseThrow(() -> ex);
         }
 
-        publisher.publish(new ReminderMessage(
-                saved.getId(),
+        publisher.publish(messageFor(appointment, saved));
+
+        return new NotificationQueuedResponse(saved.getId().toString(), saved.getStatus());
+    }
+
+    /**
+     * Everything the worker needs to compose and send, so delivery never has to
+     * read the database.
+     */
+    private ReminderMessage messageFor(Appointment appointment, Notification notification) {
+        return new ReminderMessage(
+                notification.getId(),
                 appointment.getId(),
                 appointment.getPatient().getId(),
                 appointment.getPatient().getUser().getName(),
@@ -102,10 +127,8 @@ public class ReminderService {
                 appointment.getDoctor().getName(),
                 appointment.getSlot().getDate(),
                 appointment.getSlot().getStartTime(),
-                saved.getChannel(),
-                saved.getReminderType()));
-
-        return new NotificationQueuedResponse(saved.getId().toString(), saved.getStatus());
+                notification.getChannel(),
+                notification.getReminderType());
     }
 
     /**
