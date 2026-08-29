@@ -17,5 +17,21 @@ services:
       timeout: 5s
       retries: 5
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: clinic-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: clinic_user
+      RABBITMQ_DEFAULT_PASS: clinic_pass
+    ports:
+      # 5672 for the app, 15672 for the management UI.
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
 volumes:
   clinic_pg_data:
