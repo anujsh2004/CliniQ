@@ -31,4 +31,14 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
     List<Appointment> findForDoctorOnDate(@Param("doctorId") UUID doctorId, @Param("date") LocalDate date);
 
     boolean existsBySlotIdAndStatusIn(UUID slotId, List<com.clinic.entity.AppointmentStatus> statuses);
+
+    /** Appointments still live on a given date, for the reminder sweep. */
+    @EntityGraph(attributePaths = {"doctor", "patient", "patient.user", "slot"})
+    @Query("""
+            SELECT a FROM Appointment a
+             WHERE a.slot.date = :date
+               AND a.status IN :statuses
+            """)
+    List<Appointment> findActiveOnDate(@Param("date") LocalDate date,
+                                       @Param("statuses") List<com.clinic.entity.AppointmentStatus> statuses);
 }

@@ -61,6 +61,11 @@ clinic:
     # Nightly top-up of the rolling window, plus expiry of past slots.
     generation-cron: ${CLINIC_SLOT_GENERATION_CRON:0 30 1 * * *}
 
+  notifications:
+    # Hourly rather than daily, so an appointment booked late still gets its
+    # reminder. A unique index makes the repetition harmless.
+    reminder-cron: ${CLINIC_REMINDER_CRON:0 0 * * * *}
+
   payments:
     razorpay:
       # With no key id the application falls back to the stub gateway, so the
