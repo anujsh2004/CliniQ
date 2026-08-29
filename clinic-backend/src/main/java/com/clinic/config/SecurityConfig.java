@@ -49,6 +49,9 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/health", "/actuator/health/**").permitAll()
+                        // API documentation is public: it describes the
+                        // contract, and exposes no data.
+                        .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         // The gateway signs this callback; the handler verifies it.
                         .requestMatchers(HttpMethod.POST, "/api/v1/payments/webhook").permitAll()

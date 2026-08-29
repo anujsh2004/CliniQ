@@ -27,6 +27,27 @@ changes, update the contract first, then implement it.**
 - **Recommendation:** (a). It is the smaller change and matches how the clinic
   actually onboards staff.
 
+### D16 — Razorpay has never run against real credentials
+
+- **Where:** `feature/payments` (PR #12)
+- **Shipped:** a stub gateway stands in whenever `RAZORPAY_KEY_ID` is blank. It
+  signs and verifies webhooks with the same HMAC-SHA256 scheme as the real
+  gateway, so the security-critical path is the one that ships; only the
+  order-creation network call is faked.
+- **What is missing:** sandbox keys. The `RazorpayGateway` REST call has never
+  been exercised against Razorpay, so its request shape and error handling are
+  unproven.
+
+### D19 — No WhatsApp provider
+
+- **Where:** `feature/notifications-worker` (PR #15)
+- **Shipped:** a logging sender that records the message it would have sent, so
+  a staging run shows exactly what a patient would receive. Nothing has ever
+  been delivered to a real phone.
+- **Needs:** a provider decision (Twilio, or a direct WhatsApp BSP —
+  `tech-stack.md` §5 names Twilio as one option without committing) and sandbox
+  credentials.
+
 ### D2 — Data retention, PII and backup policy
 
 - **Where:** `product-description.md` §22 item 7
@@ -108,6 +129,43 @@ changes, update the contract first, then implement it.**
 - **Awaiting:** confirmation, or a preference to always show payment state for
   the front desk.
 
+### D17 — Refunds are logged, not issued
+
+- **Where:** `feature/payments` (PR #12)
+- **Shipped:** a capture arriving for an already-cancelled appointment records
+  the payment and writes a warning. No refund API call and no `REFUNDED`
+  transition; contract §14 covers order creation and capture only.
+
+### D18 — Payments auto-capture
+
+- **Where:** `feature/payments` (PR #12)
+- **Shipped:** orders are created with `payment_capture: 1`, so an authorised
+  payment is captured immediately rather than needing a second step.
+
+### D20 — `DELIVERED` is never reached
+
+- **Where:** `feature/notifications-worker` (PR #15)
+- **Contract says:** notifications move `QUEUED → SENT → DELIVERED` (§17).
+- **Shipped:** delivery stops at `SENT`. `DELIVERED` requires a provider
+  delivery-receipt callback, which needs an endpoint the contract does not
+  define.
+
+### D21 — One unexplained lost message
+
+- **Where:** `feature/notifications-worker` (PR #15)
+- **Observed:** a message published before the worker existed vanished from the
+  queue with no consumer to take it, leaving its notification stuck at `QUEUED`.
+- **Mitigated:** `QUEUED` and `FAILED` reminders are now republished when
+  re-queued, so the state is recoverable. The disappearance itself is not root
+  caused, and is recorded rather than assumed understood.
+
+### D22 — Cached doctor data is only evicted on creation
+
+- **Where:** `feature/redis` (PR #16)
+- **Shipped:** there is no doctor *update* endpoint yet, so eviction is wired to
+  creation only. When editing a doctor ships, it must evict too, or profiles go
+  stale for up to the 10-minute TTL.
+
 ---
 
 ## 🟢 Decided, recorded
@@ -132,6 +190,18 @@ documentation use `chore/` and `docs/` rather than borrowing one.
 
 Cancelling an appointment an hour after it should have started must not put a
 dead slot back on the market.
+
+### D23 — Redis listens on host port 6380
+
+Another project on this machine already binds 6379. Same reasoning as Postgres
+on 5433. Container ports are unchanged; only the host mapping differs.
+
+### D24 — Slot availability and patient data are never cached
+
+The database transaction is the only authority on whether a slot is free: a
+cache answering that question could hand two patients the same slot. Patient
+data is per-caller and does not belong in a shared cache. Only the doctor list
+and doctor profile are cached.
 
 ### D15 — Registration creates patients only, in the UI
 

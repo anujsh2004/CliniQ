@@ -91,6 +91,16 @@ clinic:
       webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:dev-only-webhook-secret-change-me}
       api-base-url: ${RAZORPAY_API_BASE_URL:https://api.razorpay.com}
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    # Endpoints grouped in the order a reader meets them, rather than
+    # alphabetically.
+    tags-sorter: alpha
+    operations-sorter: method
+
 server:
   port: ${SERVER_PORT:8080}
 
