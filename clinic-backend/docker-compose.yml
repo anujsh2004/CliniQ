@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: clinic-postgres
+    environment:
+      POSTGRES_DB: clinicdb
+      POSTGRES_USER: clinic_user
+      POSTGRES_PASSWORD: clinic_pass
+      TZ: Asia/Kolkata
+    ports:
+      - "5433:5432"
+    volumes:
+      - clinic_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clinic_user -d clinicdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  clinic_pg_data:
