@@ -12,6 +12,7 @@ FAQ answering and post-visit follow-ups.
 | [`product-description.md`](product-description.md) | Product requirements, user journeys, MVP scope, acceptance criteria. |
 | [`design.md`](design.md) | Design system and UX direction for the frontend. |
 | [`tech-stack.md`](tech-stack.md) | Architecture, phased roadmap, recommended implementation order. |
+| [`docs/open-decisions.md`](docs/open-decisions.md) | Every point where implementation ran ahead of the contract, and what still needs a decision. |
 
 If a requirement changes, update the API contract first, then implement it.
 
