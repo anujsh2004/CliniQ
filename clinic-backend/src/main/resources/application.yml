@@ -29,6 +29,22 @@ spring:
   jackson:
     default-property-inclusion: non_null
 
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:clinic_user}
+    password: ${RABBITMQ_PASSWORD:clinic_pass}
+    listener:
+      simple:
+        # A delivery that keeps failing is retried with backoff and then dead
+        # lettered, rather than spinning forever and starving the queue.
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          initial-interval: 2s
+          max-attempts: 4
+          multiplier: 2.0
+
 clinic:
   jwt:
     # Dev-only fallback. Production injects CLINIC_JWT_SECRET from the secret
