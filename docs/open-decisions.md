@@ -206,6 +206,14 @@ documentation use `chore/` and `docs/` rather than borrowing one.
 Cancelling an appointment an hour after it should have started must not put a
 dead slot back on the market.
 
+### D26 — Status and muted colours are darker than design.md's hex values
+
+The hex codes in `design.md` §1.3 did not meet the 4.5:1 contrast that
+`design.md` §3.7 itself requires. Measured against the 10% tint each status
+badge sits on, the originals scored between 2.9 and 4.3. The shipped tokens keep
+the same hues and clear 4.9:1. Where the document contradicted itself, the
+accessibility commitment won over the illustrative colour values.
+
 ### D23 — Redis listens on host port 6380
 
 Another project on this machine already binds 6379. Same reasoning as Postgres

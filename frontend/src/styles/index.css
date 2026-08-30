@@ -6,6 +6,13 @@
  * Design tokens from design.md 1.3. Light mode is the base; the dark palette
  * covers the staff-facing dashboards, which are used in low-light front-desk
  * setups (design.md 1.3, flagged there as a recommendation).
+ *
+ * The status and muted colours are darker than the hex values written in
+ * design.md 1.3. Those values did not meet the 4.5:1 contrast that design.md
+ * 3.7 itself requires: measured against the 10% tint each badge sits on, the
+ * originals scored between 2.9 and 4.3. These shades keep the same hues and
+ * clear 4.9:1, so the document's own accessibility commitment is honoured
+ * rather than its illustrative hex codes.
  */
 :root {
   --color-bg: #f7f8fa;
@@ -13,13 +20,13 @@
   --color-border: #e4e7ec;
   --color-text-primary: #0f1728;
   --color-text-secondary: #5b6472;
-  --color-text-muted: #8a93a2;
+  --color-text-muted: #646d7d;
   --color-accent: #2a5ce0;
   --color-accent-hover: #2148b8;
-  --color-success: #1a9e6b;
-  --color-warning: #c77b10;
-  --color-danger: #d23b3b;
-  --color-neutral: #6b7280;
+  --color-success: #12704c;
+  --color-warning: #8d570b;
+  --color-danger: #b82a2a;
+  --color-neutral: #5d636f;
 }
 
 :root[data-theme='dark'] {
