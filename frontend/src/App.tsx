@@ -4,6 +4,10 @@ import { RequireAuth } from '@/components/RequireAuth';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { Placeholder } from '@/pages/Placeholder';
+import { AppointmentsPage } from '@/pages/AppointmentsPage';
+import { DoctorDetailPage } from '@/pages/DoctorDetailPage';
+import { DoctorsPage } from '@/pages/DoctorsPage';
+import { ProfilePage } from '@/pages/ProfilePage';
 
 /**
  * Every route in product-description.md section 6 renders its correct layout
@@ -17,31 +21,15 @@ export function App() {
 
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
-          <Route
-            path="/doctors"
-            element={<Placeholder title="Doctors" description="The doctor list lands next." />}
-          />
-          <Route
-            path="/doctors/:doctorId"
-            element={
-              <Placeholder title="Doctor" description="Profile and slot picker land next." />
-            }
-          />
+          <Route path="/doctors" element={<DoctorsPage />} />
+          <Route path="/doctors/:doctorId" element={<DoctorDetailPage />} />
         </Route>
       </Route>
 
       <Route element={<RequireAuth roles={['PATIENT']} />}>
         <Route element={<AppShell />}>
-          <Route
-            path="/appointments"
-            element={
-              <Placeholder title="My appointments" description="Your bookings land next." />
-            }
-          />
-          <Route
-            path="/profile"
-            element={<Placeholder title="Profile" description="Your details land next." />}
-          />
+          <Route path="/appointments" element={<AppointmentsPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
         </Route>
       </Route>
 
