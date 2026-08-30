@@ -10,6 +10,7 @@ import com.clinic.entity.AppointmentStatus;
 import com.clinic.entity.PaymentStatus;
 import com.clinic.exception.AppointmentNotFoundException;
 import com.clinic.security.JwtService;
+import com.clinic.service.AppointmentBookingService;
 import com.clinic.service.AppointmentQueryService;
 import com.clinic.testsupport.SecuritySliceTestConfig;
 import org.junit.jupiter.api.Test;
@@ -44,6 +45,9 @@ class AppointmentControllerTest {
 
     @MockitoBean
     private AppointmentQueryService appointmentQueryService;
+
+    @MockitoBean
+    private AppointmentBookingService appointmentBookingService;
 
     @MockitoBean
     private JwtService jwtService;
