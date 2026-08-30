@@ -159,6 +159,21 @@ changes, update the contract first, then implement it.**
   re-queued, so the state is recoverable. The disappearance itself is not root
   caused, and is recorded rather than assumed understood.
 
+### D25 — The Redis cache makes the doctor list slower, not faster
+
+- **Where:** `feature/redis` (PR #16), measured in `docs/load-test-results.md`
+- **Observed:** at 100 concurrent clients the *cached* doctor list has a p95 of
+  624ms, while the *uncached* slot fetch manages 334ms. The cache is overhead at
+  this data size: the doctor list is a trivial query over three rows, and a
+  Redis round trip plus deserialisation costs more than the query it replaces.
+- **Options:** (a) drop caching for this endpoint until the roster is large
+  enough to justify it; (b) keep it in anticipation of scale and accept the cost
+  now; (c) keep it but shorten the path, for example by caching the serialised
+  response rather than the object graph.
+- **Recommendation:** (a) for now. The cache was added because `tech-stack.md`
+  nominates doctor reads for caching, which is sound reasoning about a larger
+  clinic, but it is not earning its place against today's data.
+
 ### D22 — Cached doctor data is only evicted on creation
 
 - **Where:** `feature/redis` (PR #16)
