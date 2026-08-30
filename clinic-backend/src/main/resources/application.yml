@@ -76,6 +76,14 @@ clinic:
     # Nightly top-up of the rolling window, plus expiry of past slots.
     generation-cron: ${CLINIC_SLOT_GENERATION_CRON:0 30 1 * * *}
 
+  rate-limit:
+    # Credential stuffing defence on the auth endpoints (tech-stack.md 4).
+    # Ten attempts a minute is far above what a person typing a password needs
+    # and far below what automated guessing requires to be useful.
+    enabled: ${CLINIC_RATE_LIMIT_ENABLED:true}
+    max-attempts: ${CLINIC_RATE_LIMIT_MAX_ATTEMPTS:10}
+    window-seconds: ${CLINIC_RATE_LIMIT_WINDOW_SECONDS:60}
+
   notifications:
     # Hourly rather than daily, so an appointment booked late still gets its
     # reminder. A unique index makes the repetition harmless.
