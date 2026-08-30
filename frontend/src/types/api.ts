@@ -158,6 +158,17 @@ export interface DoctorDayAppointments {
   appointments: DoctorDayAppointment[];
 }
 
+/** POST /api/v1/payments/create-order (API contract 14). */
+export interface PaymentOrder {
+  paymentId: string;
+  appointmentId: string;
+  gateway: string;
+  orderId: string;
+  amount: number;
+  currency: string;
+  status: PaymentStatus;
+}
+
 export interface PatientProfile {
   patientId: string;
   name: string;

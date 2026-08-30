@@ -6,9 +6,11 @@ import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { PageHeader } from '@/components/PageHeader';
+import { PaymentAction } from '@/components/PaymentAction';
 import { StatusBadge } from '@/components/StatusBadge';
 import { EmptyState, ErrorState, SkeletonRows } from '@/components/States';
 import { useToast } from '@/components/Toast';
+import { useAuth } from '@/context/AuthContext';
 import { formatDate, formatTime } from '@/lib/format';
 import type { AppointmentListItem } from '@/types/api';
 
@@ -17,8 +19,35 @@ function isActionable(status: AppointmentListItem['status']): boolean {
   return status === 'PENDING_PAYMENT' || status === 'CONFIRMED';
 }
 
+/**
+ * Whether the payment badge tells the patient anything the appointment status
+ * has not already said.
+ *
+ * <p>A cancelled appointment carries no payment obligation, so a "Pending"
+ * badge on one is noise at best and alarming at worst. And PENDING beside
+ * PENDING_PAYMENT is the same fact twice. What is worth showing is money that
+ * actually moved, or failed to.
+ */
+function paymentBadgeIsInformative(appointment: AppointmentListItem): boolean {
+  if (appointment.status === 'CANCELLED') {
+    return false;
+  }
+  return appointment.paymentStatus !== 'PENDING';
+}
+
+/** An appointment the patient still owes money on. */
+function awaitsPayment(appointment: AppointmentListItem): boolean {
+  return (
+    appointment.status === 'PENDING_PAYMENT' &&
+    (appointment.paymentStatus === 'PENDING' ||
+      appointment.paymentStatus === 'CREATED' ||
+      appointment.paymentStatus === 'FAILED')
+  );
+}
+
 export function AppointmentsPage() {
   const toast = useToast();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [cancelling, setCancelling] = useState<AppointmentListItem | null>(null);
   const [reason, setReason] = useState('');
@@ -100,7 +129,15 @@ export function AppointmentsPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge status={appointment.status} />
-                  <StatusBadge status={appointment.paymentStatus} />
+                  {paymentBadgeIsInformative(appointment) && (
+                    <StatusBadge status={appointment.paymentStatus} />
+                  )}
+                  {awaitsPayment(appointment) && (
+                    <PaymentAction
+                      appointment={appointment}
+                      patientName={user?.name ?? ''}
+                    />
+                  )}
                   {/* design.md 4.3: actions render only where they are valid. */}
                   {isActionable(appointment.status) && (
                     <Button variant="secondary" onClick={() => setCancelling(appointment)}>
