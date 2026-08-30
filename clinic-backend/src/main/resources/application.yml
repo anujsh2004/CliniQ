@@ -29,6 +29,14 @@ spring:
   jackson:
     default-property-inclusion: non_null
 
+clinic:
+  jwt:
+    # Dev-only fallback. Production injects CLINIC_JWT_SECRET from the secret
+    # store; secrets are never committed (API contract section 19).
+    secret: ${CLINIC_JWT_SECRET:dev-only-secret-change-me-in-every-real-environment}
+    access-token-seconds: ${CLINIC_JWT_ACCESS_SECONDS:3600}
+    refresh-token-seconds: ${CLINIC_JWT_REFRESH_SECONDS:604800}
+
 server:
   port: ${SERVER_PORT:8080}
 

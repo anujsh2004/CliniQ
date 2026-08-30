@@ -4,7 +4,9 @@ import com.clinic.controller.HealthController;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import com.clinic.security.JwtService;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -20,6 +22,10 @@ class GlobalExceptionHandlerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    // The security filter chain is part of the slice; its JWT collaborator is not.
+    @MockitoBean
+    private JwtService jwtService;
 
     @Test
     void unknownRouteReturns404InStandardEnvelope() throws Exception {

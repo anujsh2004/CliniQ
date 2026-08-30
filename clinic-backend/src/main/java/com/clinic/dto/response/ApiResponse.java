@@ -1,7 +1,6 @@
 package com.clinic.dto.response;
 
 import com.clinic.config.RequestIdFilter;
-import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.time.OffsetDateTime;
 
@@ -10,7 +9,6 @@ import java.time.OffsetDateTime;
  * in the product is wrapped in this shape so the frontend needs no
  * feature-specific parsing.
  */
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public record ApiResponse<T>(
         boolean success,
         String message,
