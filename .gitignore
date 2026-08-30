@@ -34,3 +34,6 @@ desktop.ini
 
 # Frontend build output
 frontend/dist/
+
+# TypeScript incremental build info
+*.tsbuildinfo
