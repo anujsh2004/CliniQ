@@ -90,7 +90,7 @@ export function LoginPage() {
 
         <p className="mt-4 text-meta text-text-secondary">
           New here?{' '}
-          <Link to="/register" className="text-accent hover:underline">
+          <Link to="/register" className="text-accent underline underline-offset-2">
             Create an account
           </Link>
         </p>
