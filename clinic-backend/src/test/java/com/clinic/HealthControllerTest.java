@@ -3,7 +3,9 @@ package com.clinic;
 import com.clinic.controller.HealthController;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import com.clinic.testsupport.SecuritySliceTestConfig;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import com.clinic.security.JwtService;
@@ -16,6 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Locks the health endpoint to the standard success envelope (API contract 7).
  */
 @WebMvcTest(HealthController.class)
+@Import(SecuritySliceTestConfig.class)
 class HealthControllerTest {
 
     @Autowired
