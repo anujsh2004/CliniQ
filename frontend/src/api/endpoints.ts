@@ -1,6 +1,7 @@
 import { request } from './client';
 import type {
   Availability,
+  PaymentOrder,
   AppointmentCreated,
   AppointmentDetail,
   AppointmentListItem,
@@ -69,6 +70,21 @@ export const patients = {
     request<{ patientId: string; name: string; phone: string }>('/patients/me', {
       method: 'PUT',
       body,
+    }),
+};
+
+export const payments = {
+  /**
+   * Creates a gateway order for an appointment (API contract 14).
+   *
+   * <p>Nothing the browser reports about the outcome is trusted: the
+   * appointment only becomes CONFIRMED when the gateway's signed webhook
+   * reaches the backend.
+   */
+  createOrder: (appointmentId: string) =>
+    request<PaymentOrder>('/payments/create-order', {
+      method: 'POST',
+      body: { appointmentId },
     }),
 };
 

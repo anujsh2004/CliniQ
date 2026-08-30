@@ -118,17 +118,6 @@ changes, update the contract first, then implement it.**
 - **Shipped:** 422 with a field error on `phone`. §7a has `DUPLICATE_EMAIL` but
   no phone equivalent.
 
-### D10 — Payment badges on closed appointments
-
-- **Where:** `feature/frontend-booking-flow` (PR #9)
-- **Observed:** a cancelled appointment still shows a "Pending" payment badge,
-  and a `PENDING_PAYMENT` appointment shows two amber badges saying the same
-  thing.
-- **Proposed:** show the payment badge only when it adds information — `PAID`,
-  `FAILED`, `REFUNDED` — and never on a cancelled appointment.
-- **Awaiting:** confirmation, or a preference to always show payment state for
-  the front desk.
-
 ### D17 — Refunds are logged, not issued
 
 - **Where:** `feature/payments` (PR #12)
@@ -213,6 +202,14 @@ The hex codes in `design.md` §1.3 did not meet the 4.5:1 contrast that
 badge sits on, the originals scored between 2.9 and 4.3. The shipped tokens keep
 the same hues and clear 4.9:1. Where the document contradicted itself, the
 accessibility commitment won over the illustrative colour values.
+
+### D10 — Payment badges show only when they say something new
+
+Resolved on `feature/frontend-payments`. A cancelled appointment carries no
+payment obligation, so a "Pending" badge on one was noise at best and alarming
+at worst, and `PENDING` beside `PENDING_PAYMENT` repeated the same fact. The
+badge now appears only for `PAID`, `FAILED` and `REFUNDED`, and never on a
+cancelled appointment.
 
 ### D23 — Redis listens on host port 6380
 
