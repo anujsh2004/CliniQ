@@ -20,19 +20,33 @@ function isActionable(status: AppointmentListItem['status']): boolean {
 }
 
 /**
+ * Payment states worth showing a patient: money that actually moved, or failed
+ * to, or came back.
+ *
+ * <p>Deliberately an allowlist rather than "not PENDING". PENDING and CREATED
+ * both mean the same thing to a patient - you have not paid yet - which the
+ * status already says as "Pending payment". CREATED in particular is the
+ * gateway's own word for "an order exists", which is an implementation detail
+ * of Razorpay rather than anything a patient can act on.
+ */
+const INFORMATIVE_PAYMENT_STATES: ReadonlySet<AppointmentListItem['paymentStatus']> = new Set([
+  'PAID',
+  'FAILED',
+  'REFUNDED',
+]);
+
+/**
  * Whether the payment badge tells the patient anything the appointment status
  * has not already said.
  *
- * <p>A cancelled appointment carries no payment obligation, so a "Pending"
- * badge on one is noise at best and alarming at worst. And PENDING beside
- * PENDING_PAYMENT is the same fact twice. What is worth showing is money that
- * actually moved, or failed to.
+ * <p>A cancelled appointment carries no payment obligation, so a payment badge
+ * on one is noise at best and alarming at worst.
  */
 function paymentBadgeIsInformative(appointment: AppointmentListItem): boolean {
   if (appointment.status === 'CANCELLED') {
     return false;
   }
-  return appointment.paymentStatus !== 'PENDING';
+  return INFORMATIVE_PAYMENT_STATES.has(appointment.paymentStatus);
 }
 
 /** An appointment the patient still owes money on. */

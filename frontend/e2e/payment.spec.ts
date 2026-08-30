@@ -107,6 +107,27 @@ test.describe('Paying for an appointment', () => {
     await expect(page.getByRole('button', { name: /pay now/i })).toBeHidden();
   });
 
+  test('starting a payment does not add a meaningless "Created" badge', async ({
+    clientPage: page,
+    request,
+  }) => {
+    // Once an order exists the payment status becomes CREATED, which is the
+    // gateway's word for "an order exists". To a patient it says nothing the
+    // status has not already said, and it read as a second badge beside
+    // "Pending payment".
+    const patient = await seedPatient(request, 'Created Badge');
+    await signIn(page, patient.email);
+    await bookAnAppointment(page, '09:00');
+
+    await page.getByRole('button', { name: /pay now/i }).click();
+    await expect(page.getByText(/not set up yet/i)).toBeVisible();
+
+    await expect(page.getByText('Pending payment')).toBeVisible();
+    await expect(page.getByText('Created', { exact: true })).toBeHidden();
+    // Still payable.
+    await expect(page.getByRole('button', { name: /pay now/i })).toBeVisible();
+  });
+
   test('an unpaid appointment does not say "Pending" twice', async ({
     clientPage: page,
     request,
