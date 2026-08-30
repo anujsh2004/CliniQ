@@ -31,3 +31,9 @@ desktop.ini
 
 # Logs
 *.log
+
+# Frontend build output
+frontend/dist/
+
+# TypeScript incremental build info
+*.tsbuildinfo
