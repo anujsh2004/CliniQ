@@ -1,0 +1,158 @@
+# Open Decisions
+
+Every point where implementation ran ahead of the API contract, or where the
+contract left something undefined. Each entry records the default that shipped,
+so nothing is silently a guess.
+
+**Status key** — 🔴 needs a decision before production · 🟡 worth confirming ·
+🟢 decided, recorded for the record.
+
+The rule from API contract §22 applies to all of these: **if a requirement
+changes, update the contract first, then implement it.**
+
+---
+
+## 🔴 Blocking before production
+
+### D1 — Anyone can register as ADMIN or DOCTOR
+
+- **Where:** `feature/auth` (PR #2), contract §8
+- **Contract says:** the `POST /auth/register` payload includes `role`.
+- **Shipped:** the contract as written — the client chooses its own role. The
+  frontend registration form only ever sends `PATIENT`, but the API accepts any
+  value, so `curl` can mint an admin.
+- **Options:** (a) restrict `/auth/register` to `PATIENT` and create doctors and
+  admins through an admin-only endpoint; (b) gate elevated roles behind an
+  invite token.
+- **Recommendation:** (a). It is the smaller change and matches how the clinic
+  actually onboards staff.
+
+### D2 — Data retention, PII and backup policy
+
+- **Where:** `product-description.md` §22 item 7
+- **Shipped:** nothing. Appointments and patient contact details are stored
+  indefinitely.
+- **Why it matters:** this is health-adjacent personal data. The policy has to
+  exist before real patient data is entered, not after.
+
+---
+
+## 🟡 Worth confirming
+
+### D3 — No way for a doctor account to find its own doctor profile
+
+- **Where:** `feature/doctor` (PR #3), `feature/frontend-doctor-dashboard` (PR #10), contract §9/§13
+- **Contract says:** the create-doctor payload carries no `userId` or email, yet
+  `GET /doctors/me/appointments` requires that a doctor account maps to a doctor
+  profile.
+- **Shipped:** a `DOCTOR` who creates their own profile is linked to it
+  immediately; an `ADMIN` creating one leaves `user_id` null. The availability
+  screen currently locates the doctor's own profile by **matching the account
+  name against the doctor list** — the weakest code in the frontend.
+- **Recommendation:** add `GET /doctors/me` to the contract. It removes the name
+  matching and lets admins onboard doctors fully.
+
+### D4 — Admins are not scoped to a clinic
+
+- **Where:** PRs #3, #5, #6, #7; `product-description.md` §22 item 3
+- **Shipped:** any `ADMIN` can manage any doctor, any availability and any
+  appointment. There is no admin↔clinic relationship in the contract to scope
+  against.
+- **Consequence:** fine for the MVP assumption of one admin per clinic; unsafe
+  the moment a second clinic exists.
+
+### D5 — Admins may cancel and reschedule on a patient's behalf
+
+- **Where:** `feature/appointments-booking` (PR #7); `product-description.md` §16
+- **Contract says:** undefined — §16 lists it as an open question.
+- **Shipped:** allowed, because a front desk realistically needs it.
+- **Alternative:** restrict to `PATIENT` and add explicit admin endpoints to the
+  contract rather than reusing the patient-facing ones.
+
+### D6 — Slot generation horizon is global, not per clinic
+
+- **Where:** `feature/availability` (PR #5); `product-description.md` §22 item 2
+- **Shipped:** configuration `clinic.slots.generation-horizon-days`, default
+  **30 days**, with a nightly top-up. Global rather than per-clinic, since a
+  per-clinic value needs a clinic settings column.
+
+### D7 — Refresh tokens cannot be revoked
+
+- **Where:** `feature/auth` (PR #2)
+- **Shipped:** stateless JWT refresh tokens with a 7-day life and no server-side
+  store, so a leaked refresh token stays valid until it expires.
+- **Fix when needed:** a `refresh_tokens` table with revocation on logout.
+
+### D8 — Transport-level errors carry no `errorCode`
+
+- **Where:** `chore/backend-scaffold` (PR #1), contract §7a
+- **Shipped:** 404/405/415/500 use the standard envelope but omit `errorCode`,
+  because §7a defines codes for domain failures only and inventing values would
+  break the contract.
+- **Alternative:** add canonical codes for them — a contract change.
+
+### D9 — Duplicate phone number reports as `VALIDATION_ERROR`
+
+- **Where:** `feature/auth` (PR #2), `feature/patient` (PR #4)
+- **Shipped:** 422 with a field error on `phone`. §7a has `DUPLICATE_EMAIL` but
+  no phone equivalent.
+
+### D10 — Payment badges on closed appointments
+
+- **Where:** `feature/frontend-booking-flow` (PR #9)
+- **Observed:** a cancelled appointment still shows a "Pending" payment badge,
+  and a `PENDING_PAYMENT` appointment shows two amber badges saying the same
+  thing.
+- **Proposed:** show the payment badge only when it adds information — `PAID`,
+  `FAILED`, `REFUNDED` — and never on a cancelled appointment.
+- **Awaiting:** confirmation, or a preference to always show payment state for
+  the front desk.
+
+---
+
+## 🟢 Decided, recorded
+
+### D11 — Database name is `clinic_db`
+
+The team's own files disagreed (`clinicdb` in docker-compose and
+application.properties, `clinic_db` in the root application.yml). The
+initialised PostgreSQL volume has `clinic_db`, so that spelling won.
+
+### D12 — Base package is `com.clinic`
+
+Matching contract §4 exactly, rather than the generated
+`com.clinic.clinic_backend`.
+
+### D13 — Non-feature branches use a `chore/` or `docs/` prefix
+
+Contract §5 reserves the `feature/*` names for features. Project setup and
+documentation use `chore/` and `docs/` rather than borrowing one.
+
+### D14 — A released slot in the past becomes `EXPIRED`, not `AVAILABLE`
+
+Cancelling an appointment an hour after it should have started must not put a
+dead slot back on the market.
+
+### D15 — Registration creates patients only, in the UI
+
+The frontend never offers a role choice. This does not close D1, which is a
+server-side hole.
+
+---
+
+## Deferred by scope, not by oversight
+
+These are named in the source documents as out of MVP scope. Listed so they are
+not mistaken for gaps.
+
+| Item | Source |
+|---|---|
+| Email verification and password reset | `product-description.md` §22 item 1 |
+| Notification channels beyond WhatsApp | §22 item 5 |
+| Doctor search and filter by specialization | §22 item 6 |
+| Multi-clinic support for one admin | §17, §22 item 3 |
+| Analytics dashboard | §17 |
+| Cash / offline payment recording | §5.3 |
+| Rescheduling UI (API exists, screen does not) | PR #9 |
+| Editing or deleting an availability window | No `PUT`/`DELETE` in contract §11 |
+| Admin dashboard screens | PR #10 |
