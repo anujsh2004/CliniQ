@@ -63,8 +63,33 @@ Every response uses the envelope from API contract §7:
 `requestId`, assigned by `RequestIdFilter` and mirrored into the logging MDC and
 the `X-Request-Id` response header.
 
+## API documentation
+
+With the application running:
+
+- Swagger UI: <http://localhost:8080/swagger-ui.html>
+- OpenAPI document: <http://localhost:8080/v3/api-docs>
+
+Both are public: they describe the contract and expose no data. The generated
+document is derived from the code, so it cannot drift from the implementation;
+`docs/api-contract.md` remains the agreement the code is written against.
+
+## Supporting services
+
+```bash
+docker compose up -d postgres rabbitmq redis
+```
+
+| Service | Host port | Notes |
+|---|---|---|
+| PostgreSQL | 5433 | Schema owned by Flyway |
+| RabbitMQ | 5672, 15672 | Management UI on 15672 |
+| Redis | 6380 | 6379 is often taken by another local project |
+
 ## Tests
 
 ```bash
 ./mvnw test
 ```
+
+Integration tests use Testcontainers and need Docker running.
