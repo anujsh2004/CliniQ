@@ -1,3 +1,4 @@
+import { readStoredSession } from './session';
 import type { ApiError, ApiSuccess, ErrorCode, FieldError } from '@/types/api';
 
 const BASE_URL = '/api/v1';
@@ -30,7 +31,9 @@ export class ApiRequestError extends Error {
 type TokenReader = () => string | null;
 type UnauthorizedHandler = () => void;
 
-let readToken: TokenReader = () => null;
+// Reads storage by default, so a request made during the very first render -
+// before any effect has configured the client - still carries the token.
+let readToken: TokenReader = () => readStoredSession()?.accessToken ?? null;
 let onUnauthorized: UnauthorizedHandler = () => {};
 
 /**
