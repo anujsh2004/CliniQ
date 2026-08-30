@@ -3,11 +3,12 @@ import { AppShell } from '@/components/AppShell';
 import { RequireAuth } from '@/components/RequireAuth';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
-import { Placeholder } from '@/pages/Placeholder';
 import { AppointmentsPage } from '@/pages/AppointmentsPage';
 import { DoctorDetailPage } from '@/pages/DoctorDetailPage';
 import { DoctorsPage } from '@/pages/DoctorsPage';
 import { ProfilePage } from '@/pages/ProfilePage';
+import { AvailabilityPage } from '@/pages/AvailabilityPage';
+import { SchedulePage } from '@/pages/SchedulePage';
 
 /**
  * Every route in product-description.md section 6 renders its correct layout
@@ -35,21 +36,13 @@ export function App() {
 
       <Route element={<RequireAuth roles={['DOCTOR']} />}>
         <Route element={<AppShell />}>
-          <Route
-            path="/schedule"
-            element={<Placeholder title="Schedule" description="Your day lands next." />}
-          />
+          <Route path="/schedule" element={<SchedulePage />} />
         </Route>
       </Route>
 
       <Route element={<RequireAuth roles={['DOCTOR', 'ADMIN']} />}>
         <Route element={<AppShell />}>
-          <Route
-            path="/availability"
-            element={
-              <Placeholder title="Availability" description="The weekly editor lands next." />
-            }
-          />
+          <Route path="/availability" element={<AvailabilityPage />} />
         </Route>
       </Route>
 
