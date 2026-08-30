@@ -1,5 +1,15 @@
-import { expect, test, type Page } from '@playwright/test';
-import { seedDoctorWithSlots, seedPatient, signIn, type SeededDoctor } from './fixtures';
+import { expect, type Page } from '@playwright/test';
+import {
+  asClient,
+  nextClientIp,
+  openSlotGrid,
+  selectSlotAndReview,
+  seedDoctorWithSlots,
+  seedPatient,
+  signIn,
+  test,
+  type SeededDoctor,
+} from './fixtures';
 
 /**
  * The product's one non-negotiable guarantee, observed the way a patient would
@@ -26,9 +36,11 @@ test.describe('Two patients racing for one slot', () => {
 
     // Two independent browser contexts: separate cookies, separate storage,
     // genuinely two clients rather than two tabs sharing a session.
+    // Each racer gets its own client address, so the rate limiter treats them
+    // as two people rather than one machine guessing passwords.
     const [contextA, contextB] = await Promise.all([
-      browser.newContext(),
-      browser.newContext(),
+      browser.newContext({ extraHTTPHeaders: asClient(nextClientIp()) }),
+      browser.newContext({ extraHTTPHeaders: asClient(nextClientIp()) }),
     ]);
     const [pageA, pageB] = await Promise.all([contextA.newPage(), contextB.newPage()]);
 
@@ -66,10 +78,8 @@ test.describe('Two patients racing for one slot', () => {
 });
 
 async function selectSlot(page: Page, doctor: SeededDoctor, time: string): Promise<void> {
-  await page.goto(`/doctors/${doctor.doctorId}`);
-  await page.getByRole('tab', { name: formatStripLabel(doctor.date) }).click();
-  await page.getByRole('button', { name: new RegExp(`^${time}`) }).click();
-  await expect(page.getByText('Confirm your appointment')).toBeVisible();
+  await openSlotGrid(page, doctor);
+  await selectSlotAndReview(page, time);
 }
 
 /** Which side of the race this page ended up on. */
@@ -85,12 +95,3 @@ async function outcomeOf(page: Page): Promise<'booked' | 'rejected' | 'unknown'>
   return (await booked.isVisible()) ? 'booked' : 'rejected';
 }
 
-function formatStripLabel(isoDate: string): string {
-  const date = new Date(`${isoDate}T00:00:00`);
-  return new Intl.DateTimeFormat('en-IN', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(date);
-}

@@ -1,5 +1,14 @@
-import { expect, test } from '@playwright/test';
-import { bookSlotViaApi, seedDoctorWithSlots, seedPatient, signIn, type SeededDoctor } from './fixtures';
+import { expect } from '@playwright/test';
+import {
+  bookSlotViaApi,
+  seedDoctorWithSlots,
+  seedPatient,
+  openSlotGrid,
+  selectSlotAndReview,
+  signIn,
+  test,
+  type SeededDoctor,
+} from './fixtures';
 
 /**
  * The patient booking journey from product-description.md 6.1, end to end
@@ -15,29 +24,18 @@ test.describe('Patient booking journey', () => {
     doctor = await seedDoctorWithSlots(request);
   });
 
-  test('a patient registers, books a slot, and sees it in their appointments', async ({
-    page,
-    request,
-  }) => {
+  test('a patient registers, books a slot, and sees it in their appointments', async ({ clientPage: page, request }) => {
     const patient = await seedPatient(request, 'E2E Booker');
     await signIn(page, patient.email);
 
     // Straight to this run's doctor: the list is paginated and a freshly
     // created doctor is not guaranteed to be on the first page.
-    await page.goto(`/doctors/${doctor.doctorId}`);
+    await openSlotGrid(page, doctor);
     await expect(page.getByRole('heading', { name: doctor.name })).toBeVisible();
-
-    // Pick the date the doctor actually works, from the date strip.
-    await page.getByRole('tab', { name: formatStripLabel(doctor.date) }).click();
-
-    // The first free slot.
-    const slot = page.getByRole('button', { name: /^09:00/ });
-    await expect(slot).toBeEnabled();
-    await slot.click();
 
     // The review step restates the booking before it is committed, because
     // booking creates a payment obligation (design.md 3.6).
-    await expect(page.getByText('Confirm your appointment')).toBeVisible();
+    await selectSlotAndReview(page, '09:00');
     await expect(page.getByText(/09:00–09:30/)).toBeVisible();
 
     await page.getByRole('button', { name: /confirm booking/i }).click();
@@ -48,27 +46,25 @@ test.describe('Patient booking journey', () => {
     await expect(page.getByText('Pending payment')).toBeVisible();
   });
 
-  test('a booked slot is no longer offered to the next patient', async ({ page, request }) => {
+  test('a booked slot is no longer offered to the next patient', async ({ clientPage: page, request }) => {
     // Someone else takes 09:00 through the API; the grid must show it as gone
     // rather than only rejecting it on submit.
     await bookSlotViaApi(request, doctor, '09:00:00');
     const patient = await seedPatient(request, 'E2E Second Looker');
     await signIn(page, patient.email);
 
-    await page.goto(`/doctors/${doctor.doctorId}`);
-    await page.getByRole('tab', { name: formatStripLabel(doctor.date) }).click();
+    await openSlotGrid(page, doctor);
 
     await expect(page.getByRole('button', { name: /^09:00/ })).toBeDisabled();
     await expect(page.getByRole('button', { name: /^09:30/ })).toBeEnabled();
   });
 
-  test('a patient can cancel, and the slot returns to the grid', async ({ page, request }) => {
+  test('a patient can cancel, and the slot returns to the grid', async ({ clientPage: page, request }) => {
     const patient = await seedPatient(request, 'E2E Canceller');
     await signIn(page, patient.email);
 
-    await page.goto(`/doctors/${doctor.doctorId}`);
-    await page.getByRole('tab', { name: formatStripLabel(doctor.date) }).click();
-    await page.getByRole('button', { name: /^10:00/ }).click();
+    await openSlotGrid(page, doctor);
+    await selectSlotAndReview(page, '10:00');
     await page.getByRole('button', { name: /confirm booking/i }).click();
     await expect(page.getByRole('heading', { name: 'My appointments' })).toBeVisible();
 
@@ -82,21 +78,16 @@ test.describe('Patient booking journey', () => {
     await expect(page.getByText('Cancelled', { exact: true })).toBeVisible();
 
     // The released slot is bookable again.
-    await page.goto(`/doctors/${doctor.doctorId}`);
-    await page.getByRole('tab', { name: formatStripLabel(doctor.date) }).click();
+    await openSlotGrid(page, doctor);
     await expect(page.getByRole('button', { name: /^10:00/ })).toBeEnabled();
   });
 
-  test('cancelling without a reason is refused before the request is sent', async ({
-    page,
-    request,
-  }) => {
+  test('cancelling without a reason is refused before the request is sent', async ({ clientPage: page, request }) => {
     const patient = await seedPatient(request, 'E2E No Reason');
     await signIn(page, patient.email);
 
-    await page.goto(`/doctors/${doctor.doctorId}`);
-    await page.getByRole('tab', { name: formatStripLabel(doctor.date) }).click();
-    await page.getByRole('button', { name: /^10:30/ }).click();
+    await openSlotGrid(page, doctor);
+    await selectSlotAndReview(page, '10:30');
     await page.getByRole('button', { name: /confirm booking/i }).click();
     await expect(page.getByRole('heading', { name: 'My appointments' })).toBeVisible();
 
@@ -110,13 +101,3 @@ test.describe('Patient booking journey', () => {
   });
 });
 
-/** The date strip renders dates as "Wed 10 Sep 2026". */
-function formatStripLabel(isoDate: string): string {
-  const date = new Date(`${isoDate}T00:00:00`);
-  return new Intl.DateTimeFormat('en-IN', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(date);
-}
