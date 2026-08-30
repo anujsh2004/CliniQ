@@ -3,8 +3,6 @@ package com.clinic.config;
 import com.clinic.security.JwtAuthenticationFilter;
 import com.clinic.security.RestAccessDeniedHandler;
 import com.clinic.security.RestAuthenticationEntryPoint;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import com.clinic.security.JwtProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -24,7 +22,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
  */
 @Configuration
 @EnableMethodSecurity
-@EnableConfigurationProperties(JwtProperties.class)
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;

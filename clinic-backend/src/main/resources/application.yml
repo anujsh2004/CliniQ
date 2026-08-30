@@ -37,6 +37,14 @@ clinic:
     access-token-seconds: ${CLINIC_JWT_ACCESS_SECONDS:3600}
     refresh-token-seconds: ${CLINIC_JWT_REFRESH_SECONDS:604800}
 
+  slots:
+    # How far ahead bookable slots are materialised from recurring availability.
+    # The API contract does not fix this (product-description.md 22, open
+    # question 2), so it is configurable per environment.
+    generation-horizon-days: ${CLINIC_SLOT_HORIZON_DAYS:30}
+    # Nightly top-up of the rolling window, plus expiry of past slots.
+    generation-cron: ${CLINIC_SLOT_GENERATION_CRON:0 30 1 * * *}
+
 server:
   port: ${SERVER_PORT:8080}
 
