@@ -29,6 +29,21 @@ spring:
   jackson:
     default-property-inclusion: non_null
 
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6380}
+      timeout: 2s
+      # A cache is a convenience, not a dependency: if Redis is slow to answer,
+      # fail fast and read from the database instead of holding the request.
+      connect-timeout: 2s
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: ${CLINIC_CACHE_TTL:10m}
+      cache-null-values: false
+
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}

@@ -16,7 +16,11 @@ import com.clinic.repository.ClinicRepository;
 import com.clinic.repository.DoctorRepository;
 import com.clinic.repository.UserRepository;
 import com.clinic.security.AuthenticatedUser;
+import com.clinic.config.CacheConfig;
 import com.clinic.security.CurrentUser;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,7 +46,15 @@ public class DoctorService {
         this.doctorMapper = doctorMapper;
     }
 
+    /**
+     * Adding a doctor changes both the list and, potentially, a cached profile,
+     * so both caches are cleared rather than left to expire.
+     */
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.DOCTOR_LIST, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.DOCTOR_DETAIL, allEntries = true)
+    })
     public DoctorResponse create(CreateDoctorRequest request) {
         if (doctorRepository.existsByLicenseNumberIgnoreCase(request.licenseNumber())) {
             throw new FieldValidationException("licenseNumber", "License number is already registered");
@@ -59,12 +71,17 @@ public class DoctorService {
         return doctorMapper.toCreated(doctorRepository.saveAndFlush(doctor));
     }
 
+    // Cached: the same answer for every caller, and it changes only when the
+    // clinic edits its roster (tech-stack.md 3).
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheConfig.DOCTOR_LIST,
+            key = "#pageable.pageNumber + '-' + #pageable.pageSize")
     public PagedResponse<DoctorSummary> list(Pageable pageable) {
         return PagedResponse.from(doctorRepository.findAllBy(pageable), doctorMapper::toSummary);
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheConfig.DOCTOR_DETAIL, key = "#doctorId")
     public DoctorResponse get(UUID doctorId) {
         return doctorMapper.toDetail(doctorRepository.findWithClinicById(doctorId)
                 .orElseThrow(DoctorNotFoundException::new));
