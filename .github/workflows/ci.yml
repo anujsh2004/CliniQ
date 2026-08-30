@@ -1,0 +1,109 @@
+name: CI
+
+# Every pull request and every push to main. The Phase 5 definition of done in
+# tech-stack.md is that CI runs the full suite on every PR and blocks merges on
+# failure, so nothing reaches main untested.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push to a branch cancels the run still in flight for it: the older
+# result is about to be irrelevant, and runners are not free.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Both jobs are required status checks on main, so they must always
+      # report a result. A branch that does not carry the backend yet - main
+      # itself began as documentation only - reports success with nothing to
+      # do, rather than never reporting and blocking the merge forever.
+      - name: Is there a backend to test?
+        id: detect
+        run: |
+          if [ -f clinic-backend/pom.xml ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No clinic-backend/pom.xml on this branch; nothing to test."
+          fi
+
+      - name: Set up JDK 21
+        if: steps.detect.outputs.present == 'true'
+        uses: actions/setup-java@v4
+        with:
+          # The project targets Java 21 (pom.xml java.version), so CI compiles
+          # against the version that ships, not whatever is newest.
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+
+      - name: Run tests
+        if: steps.detect.outputs.present == 'true'
+        working-directory: clinic-backend
+        # Testcontainers starts a real PostgreSQL for the booking concurrency
+        # test and the OpenAPI test; the ubuntu runner has Docker available.
+        run: ./mvnw -B --no-transfer-progress verify
+
+      - name: Publish test report
+        # Runs even when the build failed - that is exactly when the report is
+        # worth reading.
+        if: always() && steps.detect.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: clinic-backend/target/surefire-reports/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  frontend:
+    name: Frontend tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Is there a frontend to test?
+        id: detect
+        run: |
+          if [ -f frontend/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No frontend/package.json on this branch; nothing to test."
+          fi
+
+      - name: Set up Node
+        if: steps.detect.outputs.present == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        if: steps.detect.outputs.present == 'true'
+        working-directory: frontend
+        # ci rather than install: it installs exactly the lockfile and fails if
+        # package.json and the lockfile disagree.
+        run: npm ci
+
+      - name: Type check and build
+        if: steps.detect.outputs.present == 'true'
+        working-directory: frontend
+        run: npm run build
+
+      - name: Run tests
+        if: steps.detect.outputs.present == 'true'
+        working-directory: frontend
+        run: npm test
