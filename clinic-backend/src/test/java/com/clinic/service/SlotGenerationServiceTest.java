@@ -76,13 +76,17 @@ class SlotGenerationServiceTest {
     @Test
     void dropsATrailingRemainderShorterThanOneSlot() {
         when(slotRepository.existsByDoctorIdAndDateAndStartTime(any(), any(), any())).thenReturn(false);
-        LocalDate nextWeek = LocalDate.now().plusDays(7);
+        // Three days out, with a horizon that reaches exactly that far. A date
+        // a week out shares today's weekday, so a horizon covering it also
+        // covers today, and whether today produced slots as well would depend
+        // on the time of day the test happened to run.
+        LocalDate target = LocalDate.now().plusDays(3);
         // 09:00-10:10 at 30 minutes: two whole slots, and the last 10 minutes
         // must not be offered as a short appointment.
         DoctorAvailability availability =
-                availability(nextWeek.getDayOfWeek(), LocalTime.of(9, 0), LocalTime.of(10, 10), 30);
+                availability(target.getDayOfWeek(), LocalTime.of(9, 0), LocalTime.of(10, 10), 30);
 
-        service(8).generateFor(availability);
+        service(3).generateFor(availability);
 
         List<Slot> saved = captureSaved();
         assertThat(saved).extracting(Slot::getStartTime)
