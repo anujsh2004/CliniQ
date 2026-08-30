@@ -13,6 +13,7 @@ FAQ answering and post-visit follow-ups.
 | [`design.md`](design.md) | Design system and UX direction for the frontend. |
 | [`tech-stack.md`](tech-stack.md) | Architecture, phased roadmap, recommended implementation order. |
 | [`docs/open-decisions.md`](docs/open-decisions.md) | Every point where implementation ran ahead of the contract, and what still needs a decision. |
+| [`docs/load-test-results.md`](docs/load-test-results.md) | Load test results against NFR-8, and what they do not cover. |
 
 If a requirement changes, update the API contract first, then implement it.
 
