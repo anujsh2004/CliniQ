@@ -9,13 +9,8 @@ import {
 } from 'react';
 import { auth } from '@/api/endpoints';
 import { configureApiClient } from '@/api/client';
+import { readStoredSession, writeStoredSession, type Session } from '@/api/session';
 import type { AuthUser, Role } from '@/types/api';
-
-interface Session {
-  accessToken: string;
-  refreshToken: string;
-  user: AuthUser;
-}
 
 interface AuthApi {
   user: AuthUser | null;
@@ -27,36 +22,6 @@ interface AuthApi {
 
 const AuthContext = createContext<AuthApi | null>(null);
 
-const STORAGE_KEY = 'cliniva.session';
-
-/**
- * Tokens are kept in sessionStorage rather than localStorage: closing the tab
- * ends the session, which suits a clinic's shared front-desk machine. The
- * access token is short-lived and the refresh token is exchanged for a new one
- * on demand.
- */
-function readStoredSession(): Session | null {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Session) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredSession(session: Session | null): void {
-  try {
-    if (session) {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-    } else {
-      sessionStorage.removeItem(STORAGE_KEY);
-    }
-  } catch {
-    // A browser with storage disabled still works; the session just ends on
-    // reload rather than surviving it.
-  }
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(() => readStoredSession());
 
@@ -65,8 +30,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     writeStoredSession(null);
   }, []);
 
-  // The API client reads the current token through these hooks rather than
-  // holding its own copy, so there is one source of truth for the session.
+  // The client already reads the token from storage by default; this only
+  // tells it what to do when the server rejects one.
   useEffect(() => {
     configureApiClient({
       readToken: () => readStoredSession()?.accessToken ?? null,

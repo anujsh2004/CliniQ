@@ -35,5 +35,9 @@ desktop.ini
 # Frontend build output
 frontend/dist/
 
+# Playwright
+frontend/playwright-report/
+frontend/test-results/
+frontend/blob-report/
 # TypeScript incremental build info
 *.tsbuildinfo

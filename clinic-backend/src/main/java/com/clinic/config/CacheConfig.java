@@ -1,14 +1,22 @@
 package com.clinic.config;
 
+import com.clinic.dto.response.DoctorResponse;
+import com.clinic.dto.response.DoctorSummary;
+import com.clinic.dto.response.PagedResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.cache.autoconfigure.RedisCacheManagerBuilderCustomizer;
+import org.springframework.cache.Cache;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.cache.interceptor.SimpleCacheErrorHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.cache.Cache;
+import org.springframework.data.redis.serializer.JacksonJsonRedisSerializer;
+import org.springframework.data.redis.serializer.RedisSerializationContext.SerializationPair;
+import tools.jackson.databind.JavaType;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Read-through caching for the read-heavy, less volatile endpoints
@@ -40,23 +48,33 @@ public class CacheConfig {
     public static final String DOCTOR_DETAIL = "doctorDetail";
 
     /**
-     * Stores cache entries as JSON rather than Java-serialised blobs.
+     * Gives each cache a serializer that knows the exact type it holds.
      *
-     * <p>Two reasons: the cached DTOs are records that would otherwise all have
-     * to implement {@code Serializable} to be cacheable at all, and a JSON
-     * entry can be read straight out of {@code redis-cli} when something looks
-     * wrong.
+     * <p>Entries are stored as JSON rather than Java-serialised blobs, so the
+     * cached DTOs need no {@code Serializable} marker and an entry can be read
+     * straight out of {@code redis-cli}.
+     *
+     * <p>The type has to be declared per cache. Plain JSON carries no type
+     * information, so a generic serializer reads every entry back as a
+     * {@code LinkedHashMap} and the cast to the DTO fails - meaning every cache
+     * <em>hit</em> returns a 500 while every miss succeeds. Naming the type per
+     * cache fixes that without resorting to embedded type metadata, which would
+     * mean enabling polymorphic deserialisation for anything that can reach
+     * Redis.
      */
     @Bean
     @ConditionalOnProperty(name = "spring.cache.type", havingValue = "redis")
-    public org.springframework.boot.cache.autoconfigure.RedisCacheManagerBuilderCustomizer
-            jsonCacheCustomizer(tools.jackson.databind.ObjectMapper objectMapper) {
-        var serializer =
-                new org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializer(objectMapper);
-        var pair = org.springframework.data.redis.serializer.RedisSerializationContext
-                .SerializationPair.fromSerializer(serializer);
-        return builder -> builder.cacheDefaults(
-                builder.cacheDefaults().serializeValuesWith(pair));
+    public RedisCacheManagerBuilderCustomizer typedCacheSerializers(ObjectMapper objectMapper) {
+        JavaType pagedDoctorSummaries = objectMapper.getTypeFactory()
+                .constructParametricType(PagedResponse.class, DoctorSummary.class);
+
+        return builder -> builder
+                .withCacheConfiguration(DOCTOR_LIST, builder.cacheDefaults()
+                        .serializeValuesWith(SerializationPair.fromSerializer(
+                                new JacksonJsonRedisSerializer<>(objectMapper, pagedDoctorSummaries))))
+                .withCacheConfiguration(DOCTOR_DETAIL, builder.cacheDefaults()
+                        .serializeValuesWith(SerializationPair.fromSerializer(
+                                new JacksonJsonRedisSerializer<>(objectMapper, DoctorResponse.class))));
     }
 
     /**
