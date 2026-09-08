@@ -206,7 +206,7 @@ class ConcurrentBookingIntegrationTest {
 
         assertThat(appointmentRepository.findAll()).hasSize(1);
         assertThat(slotRepository.findById(slot.getId()).orElseThrow().getStatus())
-                .isEqualTo(SlotStatus.BOOKED);
+                .isEqualTo(SlotStatus.HELD);
     }
 
     @Test
@@ -286,7 +286,7 @@ class ConcurrentBookingIntegrationTest {
         assertThat(slotRepository.findById(original.getId()).orElseThrow().getStatus())
                 .isEqualTo(SlotStatus.AVAILABLE);
         assertThat(slotRepository.findById(target.getId()).orElseThrow().getStatus())
-                .isEqualTo(SlotStatus.BOOKED);
+                .isEqualTo(SlotStatus.HELD);
 
         Appointment stored = appointmentRepository.findAll().getFirst();
         assertThat(stored.getSlot().getId()).isEqualTo(target.getId());

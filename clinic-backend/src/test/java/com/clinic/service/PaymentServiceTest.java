@@ -46,8 +46,16 @@ class PaymentServiceTest {
     private final PaymentRepository paymentRepository = mock(PaymentRepository.class);
     private final AppointmentRepository appointmentRepository = mock(AppointmentRepository.class);
 
+    private final com.clinic.repository.SlotRepository slotRepository =
+            mock(com.clinic.repository.SlotRepository.class);
+
+    /** No gateway credentials, which is what enables the demo confirmation. */
+    private final com.clinic.payment.PaymentProperties paymentProperties =
+            new com.clinic.payment.PaymentProperties("", "", WEBHOOK_SECRET, "https://api.razorpay.com");
+
     private final PaymentService service = new PaymentService(
-            paymentRepository, appointmentRepository, new StubPaymentGateway(WEBHOOK_SECRET));
+            paymentRepository, appointmentRepository, new StubPaymentGateway(WEBHOOK_SECRET),
+            slotRepository, paymentProperties);
 
     @AfterEach
     void clearSecurityContext() {

@@ -126,6 +126,11 @@ export interface AppointmentCreated {
 }
 
 export interface AppointmentListItem {
+  /**
+   * When this appointment's hold on its slot runs out (v1.4). Absent once it is
+   * paid for: a confirmed appointment owns its slot outright.
+   */
+  holdExpiresAt?: string;
   appointmentId: string;
   doctorName: string;
   date: string;

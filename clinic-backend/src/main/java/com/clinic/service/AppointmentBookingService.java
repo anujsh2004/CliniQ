@@ -1,5 +1,6 @@
 package com.clinic.service;
 
+import com.clinic.config.HoldProperties;
 import com.clinic.dto.request.CancelAppointmentRequest;
 import com.clinic.dto.request.CreateAppointmentRequest;
 import com.clinic.dto.request.RescheduleAppointmentRequest;
@@ -34,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
@@ -70,16 +72,20 @@ public class AppointmentBookingService {
     private final PatientService patientService;
     private final AppointmentMapper appointmentMapper;
 
+    private final HoldProperties holdProperties;
+
     public AppointmentBookingService(AppointmentRepository appointmentRepository,
                                      SlotRepository slotRepository,
                                      DoctorRepository doctorRepository,
                                      PatientService patientService,
-                                     AppointmentMapper appointmentMapper) {
+                                     AppointmentMapper appointmentMapper,
+                                     HoldProperties holdProperties) {
         this.appointmentRepository = appointmentRepository;
         this.slotRepository = slotRepository;
         this.doctorRepository = doctorRepository;
         this.patientService = patientService;
         this.appointmentMapper = appointmentMapper;
+        this.holdProperties = holdProperties;
     }
 
     /**
@@ -97,7 +103,9 @@ public class AppointmentBookingService {
         requireSlotBelongsTo(slot, doctor);
         requireSlotIsBookable(slot);
 
-        slot.setStatus(SlotStatus.BOOKED);
+        // Held, not sold. The slot is off the market while this patient pays,
+        // and returns to it if they do not (API contract 12, v1.4).
+        slot.setStatus(SlotStatus.HELD);
         slotRepository.save(slot);
 
         Appointment appointment = new Appointment();
@@ -107,6 +115,7 @@ public class AppointmentBookingService {
         appointment.setStatus(AppointmentStatus.PENDING_PAYMENT);
         appointment.setPaymentStatus(PaymentStatus.PENDING);
         appointment.setReason(request.reason());
+        appointment.setHoldExpiresAt(OffsetDateTime.now().plus(holdProperties.duration()));
 
         try {
             return appointmentMapper.toCreated(appointmentRepository.saveAndFlush(appointment));
@@ -177,7 +186,11 @@ public class AppointmentBookingService {
         requireSlotIsBookable(newSlot);
 
         releaseSlot(currentSlot);
-        newSlot.setStatus(SlotStatus.BOOKED);
+        // A rescheduled appointment keeps whatever standing it had: a
+        // confirmed one books its new slot outright, an unpaid one holds it.
+        newSlot.setStatus(appointment.getStatus() == AppointmentStatus.CONFIRMED
+                ? SlotStatus.BOOKED
+                : SlotStatus.HELD);
         slotRepository.save(newSlot);
 
         appointment.setSlot(newSlot);

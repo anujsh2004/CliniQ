@@ -15,6 +15,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
@@ -56,4 +57,12 @@ public class Appointment extends BaseEntity {
 
     @Column(name = "cancellation_reason", length = 500)
     private String cancellationReason;
+
+    /**
+     * When this appointment's hold on its slot runs out (API contract 12,
+     * v1.4). Null once the appointment is paid for: a confirmed appointment
+     * owns its slot outright.
+     */
+    @Column(name = "hold_expires_at")
+    private OffsetDateTime holdExpiresAt;
 }

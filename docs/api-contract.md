@@ -1,6 +1,6 @@
 # Clinic Management SaaS — Backend Team & API Contract
 
-**Version:** 1.3
+**Version:** 1.4
 **Authors:** Parth + Anuj | Java Spring Boot Backend
 **Status:** Binding. Endpoint shapes, the response envelope, and the canonical `ErrorCode` values
 defined here take precedence over anything improvised during implementation.
@@ -585,6 +585,23 @@ Response 201:
 }
 ```
 
+> **Changed in v1.4.** Booking now puts the slot in `HELD`, not `BOOKED`, and
+> the appointment carries a `holdExpiresAt`. The slot is off the market while
+> the patient pays and returns to `AVAILABLE` if they do not. Paying moves the
+> slot to `BOOKED` and clears the hold. A slot whose time has already passed
+> becomes `EXPIRED` rather than going back on sale.
+
+### POST /api/v1/payments/demo-confirm
+
+Confirms an appointment without a gateway. **Added in v1.4** while Razorpay is
+deferred. Takes the same path a captured webhook does: payment `PAID`,
+appointment `CONFIRMED`, slot `BOOKED`.
+
+Request: `{ "appointmentId": "uuid" }`
+
+**Refused once gateway credentials are configured**, so a demo shortcut can
+never confirm an unpaid appointment in an environment that takes real money.
+
 ### GET /api/v1/appointments/{appointmentId}
 
 Response:
@@ -936,6 +953,12 @@ simultaneously.
 | API Documentation & Testing | Anuj | Parth |
 | Docker & Deployment | Parth | Anuj |
 | Future AI Integration | Shared | Shared |
+
+### 23d. Version 1.4 Change Log
+
+Version 1.4 holds a slot rather than selling it: booking sets `HELD` with a
+`holdExpiresAt`, an unpaid hold is swept back to `AVAILABLE`, and a demo
+confirmation stands in for the gateway while Razorpay is deferred.
 
 ### 23c. Version 1.3 Change Log
 

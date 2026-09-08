@@ -1,6 +1,7 @@
 import { request } from './client';
 import type {
   Availability,
+  PaymentStatus,
   PaymentOrder,
   AppointmentCreated,
   AppointmentDetail,
@@ -113,6 +114,17 @@ export const payments = {
    * appointment only becomes CONFIRMED when the gateway's signed webhook
    * reaches the backend.
    */
+  /**
+   * Confirms an appointment without a gateway (v1.4). Razorpay is deferred, so
+   * this stands in for the checkout; the server refuses it once real
+   * credentials exist.
+   */
+  demoConfirm: (appointmentId: string) =>
+    request<{ paymentId: string; appointmentId: string; status: PaymentStatus }>(
+      '/payments/demo-confirm',
+      { method: 'POST', body: { appointmentId } },
+    ),
+
   createOrder: (appointmentId: string) =>
     request<PaymentOrder>('/payments/create-order', {
       method: 'POST',
