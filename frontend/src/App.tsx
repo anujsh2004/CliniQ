@@ -1,5 +1,6 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
+import { LandingRedirect } from '@/components/LandingRedirect';
 import { RequireAuth } from '@/components/RequireAuth';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
@@ -46,8 +47,8 @@ export function App() {
         </Route>
       </Route>
 
-      <Route path="/" element={<Navigate to="/doctors" replace />} />
-      <Route path="*" element={<Navigate to="/doctors" replace />} />
+      <Route path="/" element={<LandingRedirect />} />
+      <Route path="*" element={<LandingRedirect />} />
     </Routes>
   );
 }

@@ -15,7 +15,10 @@ interface NavItem {
  * rather than explore data (design.md 1.2).
  */
 const NAV_ITEMS: NavItem[] = [
-  { to: '/doctors', label: 'Doctors', roles: ['PATIENT', 'DOCTOR', 'ADMIN'] },
+  // Browsing doctors is a patient's task, and an admin's roster. A doctor has
+  // no reason to shop for colleagues, and it made their sidebar look like a
+  // patient's.
+  { to: '/doctors', label: 'Doctors', roles: ['PATIENT', 'ADMIN'] },
   { to: '/appointments', label: 'My appointments', roles: ['PATIENT'] },
   { to: '/schedule', label: 'Schedule', roles: ['DOCTOR'] },
   { to: '/availability', label: 'Availability', roles: ['DOCTOR', 'ADMIN'] },

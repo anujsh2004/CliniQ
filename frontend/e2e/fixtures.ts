@@ -50,6 +50,8 @@ export interface TestPatient {
 export interface SeededDoctor {
   doctorId: string;
   name: string;
+  /** The doctor account's own login, for tests that sign in as the doctor. */
+  accountEmail: string;
   /** A date, yyyy-mm-dd, on which this doctor has freshly generated slots. */
   date: string;
 }
@@ -106,16 +108,7 @@ async function token(request: APIRequestContext, email: string, clientIp: string
   return (await response.json()).data.accessToken;
 }
 
-/** The next occurrence of a weekday, far enough out to be inside the slot horizon. */
-function nextWeekday(weekday: number): Date {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-  while (date.getDay() !== weekday) {
-    date.setDate(date.getDate() + 1);
-  }
-  return date;
-}
-
+/** A Date as the API's yyyy-mm-dd, in local time rather than UTC. */
 function toApiDate(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -156,9 +149,12 @@ export async function seedDoctorWithSlots(request: APIRequestContext): Promise<S
   expect(created.status(), await created.text()).toBe(201);
   const doctorId = (await created.json()).data.doctorId;
 
-  // A weekday a few days out: inside the 30-day generation horizon and never
-  // today, so no slot has already passed.
-  const target = nextWeekday(3);
+  // Two days out. Availability is a weekly pattern, so choosing a fixed weekday
+  // silently means "and also today" whenever today happens to be that weekday -
+  // which made the empty-state test pass six days a week and fail on the
+  // seventh. Two days out can never be today's weekday.
+  const target = new Date();
+  target.setDate(target.getDate() + 2);
   const availability = await request.post(`${API}/doctors/${doctorId}/availability`, {
     headers: auth,
     data: {
@@ -170,20 +166,26 @@ export async function seedDoctorWithSlots(request: APIRequestContext): Promise<S
   });
   expect(availability.status(), await availability.text()).toBe(201);
 
-  return { doctorId, name: doctorName, date: toApiDate(target) };
+  return { doctorId, name: doctorName, accountEmail: account.email, date: toApiDate(target) };
 }
 
 export async function seedPatient(request: APIRequestContext, name: string): Promise<TestPatient> {
   return register(request, name, nextClientIp());
 }
 
-/** Signs in through the real login form, as a patient would. */
+/**
+ * Signs in through the real login form.
+ *
+ * <p>Waits for the app shell rather than a particular heading: each role lands
+ * on a different first screen, so asserting one page here would tie every test
+ * to the patient's.
+ */
 export async function signIn(page: Page, email: string): Promise<void> {
   await page.goto('/login');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: /sign in/i }).click();
-  await expect(page.getByRole('heading', { name: 'Doctors' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /sign out/i })).toBeVisible();
 }
 
 /** Books a doctor's slot at a given time through the API, as another patient would. */
