@@ -50,6 +50,8 @@ export interface TestPatient {
 export interface SeededDoctor {
   doctorId: string;
   name: string;
+  /** The doctor account's own login, for tests that sign in as the doctor. */
+  accountEmail: string;
   /** A date, yyyy-mm-dd, on which this doctor has freshly generated slots. */
   date: string;
 }
@@ -170,20 +172,26 @@ export async function seedDoctorWithSlots(request: APIRequestContext): Promise<S
   });
   expect(availability.status(), await availability.text()).toBe(201);
 
-  return { doctorId, name: doctorName, date: toApiDate(target) };
+  return { doctorId, name: doctorName, accountEmail: account.email, date: toApiDate(target) };
 }
 
 export async function seedPatient(request: APIRequestContext, name: string): Promise<TestPatient> {
   return register(request, name, nextClientIp());
 }
 
-/** Signs in through the real login form, as a patient would. */
+/**
+ * Signs in through the real login form.
+ *
+ * <p>Waits for the app shell rather than a particular heading: each role lands
+ * on a different first screen, so asserting one page here would tie every test
+ * to the patient's.
+ */
 export async function signIn(page: Page, email: string): Promise<void> {
   await page.goto('/login');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: /sign in/i }).click();
-  await expect(page.getByRole('heading', { name: 'Doctors' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /sign out/i })).toBeVisible();
 }
 
 /** Books a doctor's slot at a given time through the API, as another patient would. */
