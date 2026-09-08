@@ -47,19 +47,6 @@ changes, update the contract first, then implement it.**
 
 ## 🟡 Worth confirming
 
-### D3 — No way for a doctor account to find its own doctor profile
-
-- **Where:** `feature/doctor` (PR #3), `feature/frontend-doctor-dashboard` (PR #10), contract §9/§13
-- **Contract says:** the create-doctor payload carries no `userId` or email, yet
-  `GET /doctors/me/appointments` requires that a doctor account maps to a doctor
-  profile.
-- **Shipped:** a `DOCTOR` who creates their own profile is linked to it
-  immediately; an `ADMIN` creating one leaves `user_id` null. The availability
-  screen currently locates the doctor's own profile by **matching the account
-  name against the doctor list** — the weakest code in the frontend.
-- **Recommendation:** add `GET /doctors/me` to the contract. It removes the name
-  matching and lets admins onboard doctors fully.
-
 ### D4 — Admins are not scoped to a clinic
 
 - **Where:** PRs #3, #5, #6, #7; `product-description.md` §22 item 3
@@ -206,6 +193,24 @@ administrator with control of every doctor, schedule and appointment. It now
 creates a `PATIENT` and refuses anything else with `VALIDATION_ERROR`. Staff
 accounts are created by an administrator through `POST /api/v1/admin/accounts`,
 which also means the clinic can still add a second administrator.
+
+### D3 — A doctor account can find its own profile
+
+Resolved in API contract v1.2 with `GET /doctors/me`. The frontend previously
+matched the account's *name* against the doctor list, which picks the wrong
+profile when two doctors share a name and finds nothing for a profile an
+administrator created. Doctor creation also accepts an optional `accountEmail`,
+so an administrator can link a profile to an account rather than leaving one
+nobody can manage.
+
+### D27 — The first administrator is created from configuration
+
+A consequence of D1, found while updating the tests: once only an administrator
+can create another, a fresh database has no way in at all. On startup, if no
+administrator exists, one is created from `clinic.bootstrap.*` and the
+application logs that its password must be changed. It never runs when an
+administrator already exists, so it cannot be used to seize a clinic that is
+already running, and a blank configuration creates nothing.
 
 ### D23 — Redis listens on host port 6380
 

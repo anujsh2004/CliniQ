@@ -48,6 +48,17 @@ public class DoctorController {
         return ResponseEntity.ok(ApiResponse.success("Doctors fetched successfully", doctorService.list(pageable)));
     }
 
+    /**
+     * Must be declared before the {doctorId} route so "me" is not parsed as an
+     * identifier.
+     */
+    @GetMapping("/me")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<ApiResponse<DoctorResponse>> me() {
+        return ResponseEntity.ok(ApiResponse.success("Doctor fetched successfully",
+                doctorService.getOwnProfile()));
+    }
+
     @GetMapping("/{doctorId}")
     public ResponseEntity<ApiResponse<DoctorResponse>> get(@PathVariable UUID doctorId) {
         return ResponseEntity.ok(ApiResponse.success("Doctor fetched successfully", doctorService.get(doctorId)));

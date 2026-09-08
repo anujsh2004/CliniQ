@@ -15,6 +15,10 @@ public interface DoctorRepository extends JpaRepository<Doctor, UUID> {
 
     Optional<Doctor> findByUserId(UUID userId);
 
+    /** The calling account's own profile, clinic included. */
+    @EntityGraph(attributePaths = {"clinic"})
+    Optional<Doctor> findWithClinicByUserId(UUID userId);
+
     @EntityGraph(attributePaths = "clinic")
     Optional<Doctor> findWithClinicById(UUID id);
 

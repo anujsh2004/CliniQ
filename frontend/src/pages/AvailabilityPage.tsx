@@ -49,16 +49,16 @@ export function AvailabilityPage() {
   const [form, setForm] = useState<FormState>(INITIAL);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  // The doctor's own profile id, resolved from the doctor list. An admin
-  // arriving here has no single profile to edit, which is why the page asks
-  // them to pick a doctor first.
+  // The doctor's own profile, from the server rather than guessed. An admin
+  // has no single profile to edit, which is why the page asks them to pick a
+  // doctor instead.
   const profile = useQuery({
-    queryKey: ['doctors', 'self', user?.userId],
-    queryFn: async () => {
-      const page = await doctors.list(0, 50);
-      return page.content.find((doctor) => doctor.name === user?.name) ?? null;
-    },
-    enabled: Boolean(user),
+    queryKey: ['doctors', 'me', user?.userId],
+    queryFn: () => doctors.me(),
+    enabled: user?.role === 'DOCTOR',
+    // A doctor account with no profile linked yet is a real state, not a
+    // transient failure, so retrying it just delays the empty state.
+    retry: false,
   });
 
   const doctorId = profile.data?.doctorId;
