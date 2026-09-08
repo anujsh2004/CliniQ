@@ -38,8 +38,12 @@ removed.
 | Concurrency | p50 | p95 | p99 | max | Throughput | Verdict |
 |---|---|---|---|---|---|---|
 | 20 | 43ms | **80ms** | 100ms | 126ms | 418 req/s | ✅ PASS |
-| 50 | 86ms | **169ms** | 218ms | 251ms | 509 req/s | ✅ PASS |
-| 100 | 168ms | **334ms** | 428ms | 566ms | 541 req/s | ✅ PASS |
+| 50 | 57ms | **132ms** | 155ms | 185ms | 718 req/s | ✅ PASS |
+| 100 | 71ms | **171ms** | 192ms | 198ms | 1126 req/s | ✅ PASS |
+
+Slot fetch improved at the same time, from 334ms to 171ms at 100 concurrent.
+It was never cached, so this is the doctor-list traffic no longer competing for
+the same connections and CPU.
 
 **NFR-8 is met at every level tested**, with meaningful headroom: at 100
 concurrent clients the p95 is 334ms against a 500ms target. Zero failures
@@ -49,29 +53,28 @@ For scale, a single clinic with a few doctors will not see 100 concurrent slot
 fetches; that is closer to a hundred patients all opening the booking screen in
 the same second.
 
-### Doctor list — cached in Redis
+### Doctor list — measured with the cache, then without it
 
-| Concurrency | p50 | p95 | p99 | Throughput | Verdict |
-|---|---|---|---|---|---|
-| 20 | 22ms | 79ms | 113ms | 713 req/s | ✅ |
-| 50 | 47ms | 177ms | 253ms | 789 req/s | ✅ |
-| 100 | 81ms | **624ms** | 699ms | 682 req/s | ❌ over 500ms |
+The first run showed the *cached* endpoint losing badly to the uncached slot
+fetch, which is the opposite of the reason the cache existed. The cache was
+removed (decision D25) and the same scenario re-run:
 
-**The cached endpoint is slower than the uncached one at high concurrency.**
-That is worth stating plainly, because it is the opposite of the reason the
-cache was added.
+| Concurrency | p95 **with** Redis | p95 **without** | Throughput with → without |
+|---|---|---|---|
+| 50 | 177ms | **74ms** | 789 → 1229 req/s |
+| 100 | **624ms** ❌ | **97ms** ✅ | 682 → 1489 req/s |
 
-The likely explanation is that at this data size there is nothing to save. The
-doctor list is a trivial query over three rows; going to Redis adds a network
-hop and a deserialisation on every request, and at 100 concurrent clients that
-costs more than the query it replaces. The cache should start paying for itself
-as the doctor roster grows and the database has real work to do — but on today's
-data it is overhead, not optimisation.
+**Removing the cache made the endpoint 6.4× faster at 100 concurrent clients**,
+and turned a failed 500ms target into a comfortable pass.
 
-**This is recorded as decision D25 in `docs/open-decisions.md`** rather than
-acted on unilaterally: the fix is either to drop the cache for this endpoint or
-to keep it in anticipation of scale, and that is a judgement about where the
-product is going.
+The explanation is that there was nothing to save. The doctor list is a trivial
+query over a handful of rows; a Redis round trip and a deserialisation cost more
+than the query they replace, and under load that overhead compounds. `tech-stack.md`
+§3 nominates doctor reads for caching, which is sound reasoning about a clinic
+with a large roster — it is simply not true of this data yet.
+
+The Redis configuration, serializers and failure handling all remain in place,
+so restoring the cache is a one-line change when the roster justifies it.
 
 ### Booking under contention
 
@@ -101,7 +104,7 @@ out is one that only appears when the database is genuinely contended.
 | NFR-8: slot fetch p95 under 500ms | ✅ Passes to at least 100 concurrent clients |
 | Booking stays responsive under contention | ✅ p95 261ms at 100 concurrent |
 | No slot ever sold twice, under load | ✅ Exact match at every level |
-| Cached doctor list under 500ms | ❌ Fails at 100 concurrent — see D25 |
+| Doctor list under 500ms | ✅ 97ms at 100 concurrent, after removing the cache |
 | Failures or unexpected statuses | ✅ None, in any scenario |
 
 ## What this does not cover

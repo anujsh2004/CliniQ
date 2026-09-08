@@ -122,28 +122,6 @@ changes, update the contract first, then implement it.**
   re-queued, so the state is recoverable. The disappearance itself is not root
   caused, and is recorded rather than assumed understood.
 
-### D25 — The Redis cache makes the doctor list slower, not faster
-
-- **Where:** `feature/redis` (PR #16), measured in `docs/load-test-results.md`
-- **Observed:** at 100 concurrent clients the *cached* doctor list has a p95 of
-  624ms, while the *uncached* slot fetch manages 334ms. The cache is overhead at
-  this data size: the doctor list is a trivial query over three rows, and a
-  Redis round trip plus deserialisation costs more than the query it replaces.
-- **Options:** (a) drop caching for this endpoint until the roster is large
-  enough to justify it; (b) keep it in anticipation of scale and accept the cost
-  now; (c) keep it but shorten the path, for example by caching the serialised
-  response rather than the object graph.
-- **Recommendation:** (a) for now. The cache was added because `tech-stack.md`
-  nominates doctor reads for caching, which is sound reasoning about a larger
-  clinic, but it is not earning its place against today's data.
-
-### D22 — Cached doctor data is only evicted on creation
-
-- **Where:** `feature/redis` (PR #16)
-- **Shipped:** there is no doctor *update* endpoint yet, so eviction is wired to
-  creation only. When editing a doctor ships, it must evict too, or profiles go
-  stale for up to the 10-minute TTL.
-
 ---
 
 ## 🟢 Decided, recorded
@@ -211,6 +189,17 @@ administrator exists, one is created from `clinic.bootstrap.*` and the
 application logs that its password must be changed. It never runs when an
 administrator already exists, so it cannot be used to seize a clinic that is
 already running, and a blank configuration creates nothing.
+
+### D25 — Doctor reads are not cached, on measured evidence
+
+The load test showed the cached doctor list at a p95 of 624ms against 334ms for
+the uncached slot fetch: the cache was losing to the database it was meant to
+spare, because the list is a trivial query over a handful of rows and a Redis
+round trip costs more than the query it replaces. Removing it took the p95 to
+97ms at 100 concurrent clients, 6.4 times faster, and lifted throughput from
+682 to 1489 requests per second. The Redis configuration stays in place so the
+cache can be restored in one line when the roster is large enough to justify it.
+This also closes D22, which was about evicting a cache that no longer exists.
 
 ### D23 — Redis listens on host port 6380
 

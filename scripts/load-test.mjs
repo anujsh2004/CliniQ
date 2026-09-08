@@ -20,6 +20,11 @@ const API = args.api ?? 'http://localhost:8080/api/v1';
 const CONCURRENCY = Number(args.concurrency ?? 20);
 const REQUESTS = Number(args.requests ?? 300);
 const PASSWORD = 'StrongPassword123';
+/**
+ * Doctor accounts cannot be self-registered since contract v1.2, so the script
+ * onboards one the way the clinic does: through an administrator.
+ */
+const ADMIN_EMAIL = args.admin ?? process.env.LOAD_TEST_ADMIN_EMAIL ?? 'ramesh@example.com';
 
 /** NFR-8: slot fetch stays under this to support real-time UI feedback. */
 const SLOT_FETCH_TARGET_MS = 500;
@@ -67,7 +72,11 @@ async function seedDoctorWithSlots() {
   const email = `${unique('loaddoc')}@example.com`;
   const phone = `+9196${Math.floor(10000000 + Math.random() * 89999999)}`;
   const name = `Dr. Load ${unique('')}`;
-  await post('/auth/register', { name, email, phone, password: PASSWORD, role: 'DOCTOR' }, headers);
+
+  const adminLogin = await post('/auth/login', { email: ADMIN_EMAIL, password: PASSWORD }, client());
+  await post('/admin/accounts', { name, email, phone, password: PASSWORD, role: 'DOCTOR' },
+    { Authorization: `Bearer ${adminLogin.accessToken}`, ...headers });
+
   const login = await post('/auth/login', { email, password: PASSWORD }, headers);
   const auth = { Authorization: `Bearer ${login.accessToken}`, ...headers };
 
@@ -185,7 +194,7 @@ async function main() {
     await response.text();
   });
   report(
-    'Doctor list (cached)',
+    'Doctor list',
     doctorList.latencies,
     doctorList.failures,
     doctorList.elapsedMs,
