@@ -2,6 +2,7 @@ package com.clinic.dto.request;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -30,6 +31,14 @@ public record CreateDoctorRequest(
         @DecimalMin(value = "0.0", message = "Consultation fee cannot be negative")
         @Digits(integer = 8, fraction = 2, message = "Consultation fee has too many digits")
         BigDecimal consultationFee,
+
+        /**
+         * Optionally links the profile to an existing DOCTOR account, so that
+         * account can manage its own availability (API contract 9, v1.2).
+         * A doctor creating their own profile is linked automatically.
+         */
+        @Email(message = "Account email is invalid")
+        String accountEmail,
 
         @NotNull(message = "Clinic details are required")
         @Valid

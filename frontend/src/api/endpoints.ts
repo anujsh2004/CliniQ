@@ -44,11 +44,20 @@ export const doctors = {
 
   get: (doctorId: string) => request<DoctorDetail>(`/doctors/${doctorId}`),
 
+  /**
+   * The signed-in doctor's own profile (API contract 9, v1.2). Replaces
+   * matching the account name against the doctor list, which picked the wrong
+   * profile when two doctors shared a name.
+   */
+  me: () => request<DoctorDetail>('/doctors/me'),
+
   create: (body: {
     name: string;
     specialization: string;
     licenseNumber: string;
     consultationFee: number;
+    /** Links the profile to an existing doctor account (v1.2). */
+    accountEmail?: string;
     clinic: { name: string; address: string; phone: string };
   }) => request<DoctorDetail>('/doctors', { method: 'POST', body }),
 

@@ -13,4 +13,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     boolean existsByEmailIgnoreCase(String email);
 
     boolean existsByPhone(String phone);
+
+    /** Whether the clinic has an administrator yet (see AdminBootstrap). */
+    boolean existsByRole(com.clinic.entity.Role role);
 }

@@ -299,6 +299,7 @@ Request:
   "specialization": "Dentist",
   "licenseNumber": "LIC-12345",
   "consultationFee": 500,
+  "accountEmail": "sharma@example.com",
   "clinic": {
     "name": "Sharma Dental Clinic",
     "address": "MG Road, Chennai",
@@ -306,6 +307,12 @@ Request:
   }
 }
 ```
+
+`accountEmail` is optional and **added in v1.2**. It links the profile to an
+existing `DOCTOR` account, so that account can then use `GET /doctors/me` and
+manage its own availability. A `DOCTOR` creating their own profile is linked
+automatically and does not need it. Without it, an administrator creates a
+profile no doctor can administer.
 
 Response:
 
@@ -351,6 +358,22 @@ Response:
   }
 }
 ```
+
+### GET /api/v1/doctors/me
+
+The doctor profile belonging to the calling account. **`DOCTOR` only.**
+
+> **Added in v1.2.** A doctor account and a doctor profile are separate records,
+> and nothing in v1.1 let an account find its own profile. The frontend was
+> matching on the account's *name* against the doctor list, which picks the
+> wrong profile when two doctors share a name and finds nothing at all for a
+> profile an administrator created.
+
+Response: identical to `GET /doctors/{doctorId}`.
+
+Returns `DOCTOR_NOT_FOUND` (404) when the account has no profile linked yet -
+which is the state an administrator leaves behind by creating a profile without
+naming an account.
 
 ### GET /api/v1/doctors/{doctorId}
 
@@ -857,7 +880,9 @@ simultaneously.
 
 ### 23b. Version 1.2 Change Log
 
-Version 1.2 closes a privilege escalation in registration.
+Version 1.2 closes a privilege escalation in registration, and lets a doctor
+account find its own profile: `GET /doctors/me`, plus an optional
+`accountEmail` on doctor creation so an administrator can link the two.
 `POST /auth/register` now creates a `PATIENT` only; the endpoint is public, so
 allowing the caller to name their own role let anyone create an administrator.
 Staff accounts move to a new admin-only `POST /api/v1/admin/accounts`.

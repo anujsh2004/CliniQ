@@ -84,6 +84,15 @@ clinic:
     max-attempts: ${CLINIC_RATE_LIMIT_MAX_ATTEMPTS:10}
     window-seconds: ${CLINIC_RATE_LIMIT_WINDOW_SECONDS:60}
 
+  bootstrap:
+    # Used only when the database contains no administrator at all, which is
+    # the state a fresh deployment starts in. Since v1.2 only an administrator
+    # can create another, so without this there is no way in.
+    admin-name: ${CLINIC_BOOTSTRAP_ADMIN_NAME:Clinic Administrator}
+    admin-email: ${CLINIC_BOOTSTRAP_ADMIN_EMAIL:}
+    admin-phone: ${CLINIC_BOOTSTRAP_ADMIN_PHONE:+910000000000}
+    admin-password: ${CLINIC_BOOTSTRAP_ADMIN_PASSWORD:}
+
   notifications:
     # Hourly rather than daily, so an appointment booked late still gets its
     # reminder. A unique index makes the repetition harmless.

@@ -66,7 +66,7 @@ public class DoctorService {
         doctor.setSpecialization(request.specialization().trim());
         doctor.setLicenseNumber(request.licenseNumber().trim());
         doctor.setConsultationFee(request.consultationFee());
-        doctor.setUser(resolveOwningUser());
+        doctor.setUser(resolveOwningUser(request.accountEmail()));
 
         return doctorMapper.toCreated(doctorRepository.saveAndFlush(doctor));
     }
@@ -78,6 +78,23 @@ public class DoctorService {
             key = "#pageable.pageNumber + '-' + #pageable.pageSize")
     public PagedResponse<DoctorSummary> list(Pageable pageable) {
         return PagedResponse.from(doctorRepository.findAllBy(pageable), doctorMapper::toSummary);
+    }
+
+    /**
+     * The profile belonging to the calling account (API contract 9, v1.2).
+     *
+     * <p>An account and a profile are separate records. Before this existed the
+     * frontend matched on the account's name against the doctor list, which
+     * picks the wrong profile when two doctors share a name and finds nothing
+     * for a profile an administrator created.
+     *
+     * <p>Not cached: it is per-caller data, and the cache is shared.
+     */
+    @Transactional(readOnly = true)
+    public DoctorResponse getOwnProfile() {
+        UUID userId = CurrentUser.require().userId();
+        return doctorMapper.toDetail(doctorRepository.findWithClinicByUserId(userId)
+                .orElseThrow(DoctorNotFoundException::new));
     }
 
     @Transactional(readOnly = true)
@@ -121,14 +138,39 @@ public class DoctorService {
      * creates an unlinked profile, since the contract's payload carries no way
      * to name the account it belongs to.
      */
-    private User resolveOwningUser() {
+    /**
+     * Decides which account owns the new profile.
+     *
+     * <p>A doctor creating their own profile is linked to it. An administrator
+     * names the account with {@code accountEmail}; without it the profile has no
+     * account, and no doctor can manage its availability (decision D3).
+     */
+    private User resolveOwningUser(String accountEmail) {
         AuthenticatedUser caller = CurrentUser.require();
-        if (caller.role() != Role.DOCTOR) {
+
+        if (caller.role() == Role.DOCTOR) {
+            if (doctorRepository.findByUserId(caller.userId()).isPresent()) {
+                throw new FieldValidationException("licenseNumber",
+                        "This account already has a doctor profile");
+            }
+            return userRepository.findById(caller.userId()).orElse(null);
+        }
+
+        if (accountEmail == null || accountEmail.isBlank()) {
             return null;
         }
-        if (doctorRepository.findByUserId(caller.userId()).isPresent()) {
-            throw new FieldValidationException("licenseNumber", "This account already has a doctor profile");
+
+        User account = userRepository.findByEmailIgnoreCase(accountEmail.trim())
+                .orElseThrow(() -> new FieldValidationException("accountEmail",
+                        "No account with this email. Create one first."));
+        if (account.getRole() != Role.DOCTOR) {
+            throw new FieldValidationException("accountEmail",
+                    "That account is not a doctor account");
         }
-        return userRepository.findById(caller.userId()).orElse(null);
+        if (doctorRepository.findByUserId(account.getId()).isPresent()) {
+            throw new FieldValidationException("accountEmail",
+                    "That account already has a doctor profile");
+        }
+        return account;
     }
 }
