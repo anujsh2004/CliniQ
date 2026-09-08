@@ -14,19 +14,6 @@ changes, update the contract first, then implement it.**
 
 ## 🔴 Blocking before production
 
-### D1 — Anyone can register as ADMIN or DOCTOR
-
-- **Where:** `feature/auth` (PR #2), contract §8
-- **Contract says:** the `POST /auth/register` payload includes `role`.
-- **Shipped:** the contract as written — the client chooses its own role. The
-  frontend registration form only ever sends `PATIENT`, but the API accepts any
-  value, so `curl` can mint an admin.
-- **Options:** (a) restrict `/auth/register` to `PATIENT` and create doctors and
-  admins through an admin-only endpoint; (b) gate elevated roles behind an
-  invite token.
-- **Recommendation:** (a). It is the smaller change and matches how the clinic
-  actually onboards staff.
-
 ### D16 — Razorpay has never run against real credentials
 
 - **Where:** `feature/payments` (PR #12)
@@ -210,6 +197,15 @@ payment obligation, so a "Pending" badge on one was noise at best and alarming
 at worst, and `PENDING` beside `PENDING_PAYMENT` repeated the same fact. The
 badge now appears only for `PAID`, `FAILED` and `REFUNDED`, and never on a
 cancelled appointment.
+
+### D1 — Self-registration creates patients only
+
+Resolved in API contract v1.2. `POST /auth/register` is public by necessity, so
+letting the caller name their own role meant one curl produced a working
+administrator with control of every doctor, schedule and appointment. It now
+creates a `PATIENT` and refuses anything else with `VALIDATION_ERROR`. Staff
+accounts are created by an administrator through `POST /api/v1/admin/accounts`,
+which also means the clinic can still add a second administrator.
 
 ### D23 — Redis listens on host port 6380
 
