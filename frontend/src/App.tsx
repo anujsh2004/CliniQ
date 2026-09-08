@@ -5,6 +5,7 @@ import { RequireAuth } from '@/components/RequireAuth';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { AppointmentsPage } from '@/pages/AppointmentsPage';
+import { NotificationsPage } from '@/pages/NotificationsPage';
 import { DoctorDetailPage } from '@/pages/DoctorDetailPage';
 import { DoctorsPage } from '@/pages/DoctorsPage';
 import { ProfilePage } from '@/pages/ProfilePage';
@@ -31,6 +32,7 @@ export function App() {
       <Route element={<RequireAuth roles={['PATIENT']} />}>
         <Route element={<AppShell />}>
           <Route path="/appointments" element={<AppointmentsPage />} />
+          <Route path="/reminders" element={<NotificationsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
       </Route>

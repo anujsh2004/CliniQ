@@ -22,6 +22,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/appointments', label: 'My appointments', roles: ['PATIENT'] },
   { to: '/schedule', label: 'Schedule', roles: ['DOCTOR'] },
   { to: '/availability', label: 'Availability', roles: ['DOCTOR', 'ADMIN'] },
+  { to: '/reminders', label: 'Reminders', roles: ['PATIENT'] },
   { to: '/profile', label: 'Profile', roles: ['PATIENT'] },
 ];
 

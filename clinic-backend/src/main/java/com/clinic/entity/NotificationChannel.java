@@ -1,10 +1,14 @@
 package com.clinic.entity;
 
 /**
- * Delivery channels. WhatsApp is the only one the contract names
- * (API contract 15); SMS and email are future scope
- * (product-description.md 22, item 5).
+ * Delivery channels.
+ *
+ * <p>{@code IN_APP} is the one the product uses: reminders appear in the
+ * patient's own notification list. WhatsApp remains defined because the
+ * contract names it (API contract 15) and the worker already knows how to
+ * deliver through a provider, but no provider is configured (decision D19).
  */
 public enum NotificationChannel {
+    IN_APP,
     WHATSAPP
 }

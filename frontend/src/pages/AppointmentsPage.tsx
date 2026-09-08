@@ -8,6 +8,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { PageHeader } from '@/components/PageHeader';
 import { HoldCountdown } from '@/components/HoldCountdown';
 import { PaymentAction } from '@/components/PaymentAction';
+import { ReminderPicker } from '@/components/ReminderPicker';
 import { StatusBadge } from '@/components/StatusBadge';
 import { EmptyState, ErrorState, SkeletonRows } from '@/components/States';
 import { useToast } from '@/components/Toast';
@@ -154,6 +155,9 @@ export function AppointmentsPage() {
                         void queryClient.invalidateQueries({ queryKey: ['appointments'] })
                       }
                     />
+                  )}
+                  {isActionable(appointment.status) && (
+                    <ReminderPicker appointmentId={appointment.appointmentId} />
                   )}
                   {awaitsPayment(appointment) && (
                     <PaymentAction

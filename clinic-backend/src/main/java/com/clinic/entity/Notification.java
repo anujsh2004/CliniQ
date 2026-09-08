@@ -57,4 +57,22 @@ public class Notification extends BaseEntity {
 
     @Column(name = "failure_reason", length = 500)
     private String failureReason;
+
+    /**
+     * The wording the patient reads. Composed when the reminder is queued, so
+     * what a patient saw is preserved even if the template changes later.
+     */
+    @Column(length = 500)
+    private String message;
+
+    /** When the patient dismissed it; null while unread. */
+    @Column(name = "read_at")
+    private OffsetDateTime readAt;
+
+    /**
+     * Whether the patient asked for this reminder themselves. A patient may
+     * remove their own; the clinic's defaults are not theirs to delete.
+     */
+    @Column(name = "patient_requested", nullable = false)
+    private boolean patientRequested;
 }
