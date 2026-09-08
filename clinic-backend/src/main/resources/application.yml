@@ -94,8 +94,23 @@ clinic:
     admin-password: ${CLINIC_BOOTSTRAP_ADMIN_PASSWORD:}
 
   notifications:
-    # Hourly rather than daily, so an appointment booked late still gets its
-    # reminder. A unique index makes the repetition harmless.
+    # Reminder rules. Change an offset to move when a reminder fires, change a
+    # message to change what it says, add an entry for another reminder - all
+    # without touching code. Placeholders: {doctor} {patient} {date} {time}
+    # {clinic}.
+    reminders:
+      - offset: 24h
+        message: "Appointment with {doctor} tomorrow at {time}."
+      - offset: 1h
+        message: "Leave soon - your appointment with {doctor} is at {time}."
+
+    # The closest a patient may set their own reminder.
+    minimum-patient-offset: 15m
+
+    # How often due reminders become visible.
+    delivery-cron: ${CLINIC_REMINDER_DELIVERY_CRON:0 * * * * *}
+
+    # The legacy WhatsApp sweep, kept for the queue-based path.
     reminder-cron: ${CLINIC_REMINDER_CRON:0 0 * * * *}
 
   holds:

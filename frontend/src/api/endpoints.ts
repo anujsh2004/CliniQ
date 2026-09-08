@@ -1,6 +1,7 @@
 import { request } from './client';
 import type {
   Availability,
+  NotificationSummary,
   PaymentStatus,
   PaymentOrder,
   AppointmentCreated,
@@ -158,4 +159,25 @@ export const appointments = {
       `/appointments/${appointmentId}/complete`,
       { method: 'PATCH' },
     ),
+};
+
+export const notifications = {
+  mine: () => request<NotificationSummary[]>('/notifications'),
+
+  /** Drives the bell's unread count, so it stays a single small read. */
+  unreadCount: () => request<{ unread: number }>('/notifications/unread-count'),
+
+  addReminder: (appointmentId: string, minutesBefore: number) =>
+    request<NotificationSummary>('/notifications/reminders', {
+      method: 'POST',
+      body: { appointmentId, minutesBefore },
+    }),
+
+  removeReminder: (notificationId: string) =>
+    request<void>(`/notifications/reminders/${notificationId}`, { method: 'DELETE' }),
+
+  markRead: (notificationId: string) =>
+    request<void>(`/notifications/${notificationId}/read`, { method: 'PATCH' }),
+
+  markAllRead: () => request<void>('/notifications/read-all', { method: 'PATCH' }),
 };
