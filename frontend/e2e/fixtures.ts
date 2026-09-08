@@ -108,16 +108,7 @@ async function token(request: APIRequestContext, email: string, clientIp: string
   return (await response.json()).data.accessToken;
 }
 
-/** The next occurrence of a weekday, far enough out to be inside the slot horizon. */
-function nextWeekday(weekday: number): Date {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-  while (date.getDay() !== weekday) {
-    date.setDate(date.getDate() + 1);
-  }
-  return date;
-}
-
+/** A Date as the API's yyyy-mm-dd, in local time rather than UTC. */
 function toApiDate(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -158,9 +149,12 @@ export async function seedDoctorWithSlots(request: APIRequestContext): Promise<S
   expect(created.status(), await created.text()).toBe(201);
   const doctorId = (await created.json()).data.doctorId;
 
-  // A weekday a few days out: inside the 30-day generation horizon and never
-  // today, so no slot has already passed.
-  const target = nextWeekday(3);
+  // Two days out. Availability is a weekly pattern, so choosing a fixed weekday
+  // silently means "and also today" whenever today happens to be that weekday -
+  // which made the empty-state test pass six days a week and fail on the
+  // seventh. Two days out can never be today's weekday.
+  const target = new Date();
+  target.setDate(target.getDate() + 2);
   const availability = await request.post(`${API}/doctors/${doctorId}/availability`, {
     headers: auth,
     data: {
