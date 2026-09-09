@@ -24,6 +24,16 @@ function relativeTime(iso: string): string {
   return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
+/** How far away something still is, for reminders that have not arrived. */
+function untilTime(iso: string): string {
+  const minutes = Math.round((new Date(iso).getTime() - Date.now()) / 60_000);
+  if (minutes < 60) return `in ${Math.max(1, minutes)} min`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `in ${hours} hour${hours === 1 ? '' : 's'}`;
+  const days = Math.round(hours / 24);
+  return `in ${days} day${days === 1 ? '' : 's'}`;
+}
+
 function exactTime(iso: string): string {
   return new Date(iso).toLocaleString('en-IN', {
     day: 'numeric',
@@ -83,7 +93,11 @@ export function NotificationsPage() {
   }
 
   const items: NotificationSummary[] = query.data ?? [];
-  const unread = items.filter((item) => !item.read).length;
+  // A reminder still waiting for its moment is not news yet, but hiding it
+  // makes a freshly booked patient think the clinic forgot them.
+  const arrived = items.filter((item) => item.status !== 'QUEUED');
+  const scheduled = items.filter((item) => item.status === 'QUEUED');
+  const unread = arrived.filter((item) => !item.read).length;
 
   return (
     <>
@@ -106,7 +120,7 @@ export function NotificationsPage() {
         />
       ) : (
         <div className="flex flex-col gap-3">
-          {items.map((item) => (
+          {arrived.map((item) => (
             <Card key={item.notificationId}>
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3">
@@ -152,6 +166,38 @@ export function NotificationsPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {scheduled.length > 0 && (
+        <section className="mt-8">
+          <h2 className="text-cardTitle text-text-primary">Coming up</h2>
+          <p className="mt-1 text-meta text-text-secondary">
+            Reminders we will show you closer to the time.
+          </p>
+          <div className="mt-3 flex flex-col gap-3">
+            {scheduled.map((item) => (
+              <Card key={item.notificationId}>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-body text-text-secondary">{item.message}</p>
+                    <p className="mt-1 text-meta text-text-muted">
+                      {untilTime(item.scheduledFor)} · {exactTime(item.scheduledFor)}
+                      {item.patientRequested && ' · Your reminder'}
+                    </p>
+                  </div>
+                  {item.patientRequested && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => remove.mutate(item.notificationId)}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </section>
       )}
     </>
   );
