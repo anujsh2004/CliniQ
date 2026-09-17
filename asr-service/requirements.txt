@@ -1,0 +1,18 @@
+# Torch and torchaudio are installed separately, from PyTorch's own index, so
+# that the CUDA build is used rather than the CPU-only wheel on PyPI:
+#
+#   uv pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+#
+# Everything below comes from PyPI as normal.
+
+transformers>=4.44
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+
+# The checkpoint's remote code runs its decoder through ONNX Runtime. The
+# versions are pinned because the model card pins them and a mismatch fails at
+# transcribe time rather than at load time, which is a much worse place to
+# find out.
+onnx==1.20.1
+onnxruntime==1.20.1

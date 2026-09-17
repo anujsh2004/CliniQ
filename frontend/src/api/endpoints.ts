@@ -1,4 +1,4 @@
-import { request } from './client';
+import { request, requestForm } from './client';
 import type {
   Availability,
   NotificationSummary,
@@ -180,4 +180,30 @@ export const notifications = {
     request<void>(`/notifications/${notificationId}/read`, { method: 'PATCH' }),
 
   markAllRead: () => request<void>('/notifications/read-all', { method: 'PATCH' }),
+};
+
+export interface Transcript {
+  text: string;
+  language: string;
+  decoder: string;
+  durationSeconds: number;
+  elapsedMs: number;
+}
+
+export const voice = {
+  /**
+   * Sends a recording to the clinic's own speech model.
+   *
+   * <p>Defaults to Tamil: this endpoint exists because typing Tamil on a phone
+   * is slow, so a patient reaching for the microphone is overwhelmingly likely
+   * to be speaking it.
+   */
+  transcribe: (audio: Blob, language = 'ta') => {
+    const form = new FormData();
+    form.append('audio', audio, 'recording.webm');
+    form.append('language', language);
+    return requestForm<Transcript>('/voice/transcribe', form);
+  },
+
+  languages: () => request<{ languages: string[] }>('/voice/languages'),
 };

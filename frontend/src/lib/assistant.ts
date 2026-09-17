@@ -22,6 +22,9 @@ export const CLINIC_ADDRESS = {
   longitude: 77.6058,
 };
 
+/** Tamil block, U+0B80 to U+0BFF. One Tamil character is enough to switch. */
+const TAMIL_SCRIPT = /[஀-௿]/;
+
 export interface AssistantReply {
   text: string;
   /** Rendered as a map beneath the reply. */
@@ -144,6 +147,14 @@ async function availabilityAnswer(doctor: DoctorSummary): Promise<string> {
  * if it also contains the word "book".
  */
 export async function answer(question: string): Promise<AssistantReply> {
+  // Tamil is handled by its own intents, not by translating this English set.
+  // Loaded on demand so a patient who never speaks Tamil never downloads it,
+  // and so the two modules can refer to each other without an import cycle.
+  if (TAMIL_SCRIPT.test(question)) {
+    const { answerTamil } = await import('./assistant.ta');
+    return answerTamil(question);
+  }
+
   const asked = question.toLowerCase().trim();
 
   if (!asked) {

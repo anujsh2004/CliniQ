@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+# Downloaded model weights: ~2.5 GB, fetched from Hugging Face on first run.
+models/
+*.wav

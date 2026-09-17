@@ -112,6 +112,20 @@ public class GlobalExceptionHandler {
         return transportError(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Content type is not supported");
     }
 
+    /**
+     * The speech service is not reachable.
+     *
+     * <p>503 rather than 500: nothing is wrong with the request, and the
+     * feature is genuinely optional — the assistant still answers typed
+     * questions when the model is not running.
+     */
+    @ExceptionHandler(com.clinic.speech.SpeechUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleSpeechUnavailable(
+            com.clinic.speech.SpeechUnavailableException ex) {
+        log.warn("Speech unavailable: {}", ex.getMessage());
+        return transportError(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception ex) {
         // Never leak internals (API contract 6): log the detail, return a generic message.

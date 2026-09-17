@@ -94,6 +94,35 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   return (payload as ApiSuccess<T>).data;
 }
 
+/**
+ * The same envelope, but for a file upload.
+ *
+ * <p>Separate from {@link request} because a multipart body must not be
+ * JSON-encoded, and because the browser has to set its own Content-Type: the
+ * multipart boundary is generated per request, so setting the header by hand
+ * produces a body the server cannot parse.
+ */
+export async function requestForm<T>(path: string, form: FormData): Promise<T> {
+  const headers: Record<string, string> = {};
+  const token = readToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: form });
+  const payload = await readBody(response);
+
+  if (!response.ok) {
+    const error = new ApiRequestError(response.status, payload as Partial<ApiError>);
+    if (response.status === 401) {
+      onUnauthorized();
+    }
+    throw error;
+  }
+
+  return (payload as ApiSuccess<T>).data;
+}
+
 async function readBody(response: Response): Promise<unknown> {
   const text = await response.text();
   if (!text) {
