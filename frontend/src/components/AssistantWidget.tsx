@@ -1,18 +1,36 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { answer, CLINIC_ADDRESS, type AssistantReply } from '@/lib/assistant';
 import { TAMIL_STARTERS } from '@/lib/assistant.ta';
-import { speak, useVoiceInput } from '@/lib/useVoiceInput';
+import { speak, useVoiceInput, type VoiceLanguage } from '@/lib/useVoiceInput';
 
 interface Message {
   from: 'you' | 'assistant';
   text: string;
   map?: boolean;
   suggestions?: string[];
-  /** Set on Tamil replies so they can be read aloud in a Tamil voice. */
-  tamil?: boolean;
+  /** The script the reply is written in, so it is read aloud in that voice. */
+  language?: VoiceLanguage;
 }
 
 type Language = 'en' | 'ta';
+
+/**
+ * Which language a reply is written in, read from its script.
+ *
+ * <p>Taken from the text rather than from the language toggle, because the
+ * assistant answers in whatever the patient asked in — a Hindi question typed
+ * while the toggle says English still gets a Hindi answer, and it should be
+ * spoken in Hindi.
+ */
+function scriptOf(text: string): VoiceLanguage {
+  if (/[஀-௿]/.test(text)) {
+    return 'ta';
+  }
+  if (/[ऀ-ॿ]/.test(text)) {
+    return 'hi';
+  }
+  return 'en';
+}
 
 const OPENING: Record<Language, Message> = {
   en: {
@@ -24,7 +42,7 @@ const OPENING: Record<Language, Message> = {
     from: 'assistant',
     text: 'வணக்கம். அப்பாயிண்ட்மென்ட் பதிவு, மருத்துவர் நேரம், கிளினிக் முகவரி பற்றி கேட்கலாம். பேசவும் முடியும் — மைக் பொத்தானை அழுத்தவும்.',
     suggestions: TAMIL_STARTERS,
-    tamil: true,
+    language: 'ta',
   },
 };
 
@@ -108,9 +126,9 @@ export function AssistantWidget() {
       setThinking(true);
       try {
         const reply: AssistantReply = await answer(question);
-        // The reply is Tamil when the question was; the assistant follows the
-        // patient rather than making them follow a setting.
-        const inTamil = /[஀-௿]/.test(reply.text);
+        // The reply is in whichever language the question was; the assistant
+        // follows the patient rather than making them follow a setting.
+        const spokenIn = scriptOf(reply.text);
         setMessages((current) => [
           ...current,
           {
@@ -118,12 +136,10 @@ export function AssistantWidget() {
             text: reply.text,
             map: reply.map,
             suggestions: reply.suggestions,
-            tamil: inTamil,
+            language: spokenIn,
           },
         ]);
-        if (inTamil) {
-          speak(reply.text, 'ta-IN');
-        }
+        void speak(reply.text, spokenIn);
       } catch {
         setMessages((current) => [
           ...current,
@@ -225,7 +241,7 @@ export function AssistantWidget() {
               className={message.from === 'you' ? 'flex justify-end' : 'flex justify-start'}
             >
               <div
-                lang={message.tamil ? 'ta' : undefined}
+                lang={message.language}
                 className={`max-w-[85%] rounded-card px-3 py-2 text-body ${
                   message.from === 'you' ? 'bg-accent text-white' : 'bg-bg text-text-primary'
                 }`}
