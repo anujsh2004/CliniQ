@@ -1,5 +1,6 @@
 import { doctors } from '@/api/endpoints';
 import type { DoctorSummary } from '@/types/api';
+import { matchDoctors } from './doctorNames';
 
 /**
  * A scripted assistant, not an AI one.
@@ -24,6 +25,24 @@ export const CLINIC_ADDRESS = {
 
 /** Tamil block, U+0B80 to U+0BFF. One Tamil character is enough to switch. */
 const TAMIL_SCRIPT = /[஀-௿]/;
+
+/** Devanagari block, U+0900 to U+097F. */
+const DEVANAGARI = /[ऀ-ॿ]/;
+
+/**
+ * Anything that sounds like a symptom, so it can be refused rather than
+ * answered. Matched before every other intent: a patient describing chest pain
+ * must not receive a scripted reply about opening hours, and must never
+ * receive anything that reads as advice.
+ */
+const MEDICAL =
+  /\b(pain|hurt|hurts|fever|sick|ill|symptom|symptoms|cough|dizzy|vomit|nausea|bleed|bleeding|breathe|breathing|medicine|medication|tablet|dose|diagnos|treatment|cure)\b/;
+
+const MEDICAL_ANSWER = [
+  'I cannot give medical advice.',
+  'If you are unwell, please contact the clinic directly, or go to your nearest hospital straight away in an emergency.',
+  'I can help you book an appointment.',
+].join('\n');
 
 export interface AssistantReply {
   text: string;
@@ -79,21 +98,6 @@ const REMINDER_ANSWER = [
   'Reminders appear under Reminders in the menu.',
 ].join('\n');
 
-/** Every doctor whose name appears in the question. */
-function doctorsNamedIn(question: string, all: DoctorSummary[]): DoctorSummary[] {
-  const asked = question.toLowerCase();
-  return all.filter((doctor) => {
-    const full = doctor.name.toLowerCase();
-    const withoutTitle = full.replace(/^dr\.?\s*/, '');
-    const surname = withoutTitle.split(/\s+/).pop() ?? '';
-    return (
-      asked.includes(full) ||
-      asked.includes(withoutTitle) ||
-      (surname.length > 3 && asked.includes(surname))
-    );
-  });
-}
-
 /**
  * Finds doctors by name, paging until they are found.
  *
@@ -113,7 +117,7 @@ async function findDoctorsByName(asked: string): Promise<{
     if (sample.length === 0) {
       sample.push(...result.content.slice(0, 6).map((doctor) => doctor.name));
     }
-    const matches = doctorsNamedIn(asked, result.content);
+    const matches = matchDoctors(asked, result.content);
     if (matches.length > 0) {
       return { matches, sample };
     }
@@ -147,18 +151,30 @@ async function availabilityAnswer(doctor: DoctorSummary): Promise<string> {
  * if it also contains the word "book".
  */
 export async function answer(question: string): Promise<AssistantReply> {
-  // Tamil is handled by its own intents, not by translating this English set.
-  // Loaded on demand so a patient who never speaks Tamil never downloads it,
-  // and so the two modules can refer to each other without an import cycle.
+  // Each language is handled by its own intents, not by translating this
+  // English set. Loaded on demand so a patient who only ever speaks one
+  // language never downloads the others, and so the modules can refer to each
+  // other without an import cycle.
   if (TAMIL_SCRIPT.test(question)) {
     const { answerTamil } = await import('./assistant.ta');
     return answerTamil(question);
+  }
+  if (DEVANAGARI.test(question)) {
+    const { answerHindi } = await import('./assistant.hi');
+    return answerHindi(question);
   }
 
   const asked = question.toLowerCase().trim();
 
   if (!asked) {
     return { text: 'Ask me about booking, a doctor’s hours, or where the clinic is.' };
+  }
+
+  // Symptoms are refused before any other intent can claim them. "I have a
+  // pain in my chest" must never produce a scripted answer about opening
+  // hours, and must never produce anything resembling advice.
+  if (MEDICAL.test(asked)) {
+    return { text: MEDICAL_ANSWER, suggestions: ['How do I book an appointment?'] };
   }
 
   if (/\b(where|address|located|location|map|reach|direction)/.test(asked)) {

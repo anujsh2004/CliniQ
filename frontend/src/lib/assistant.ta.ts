@@ -1,6 +1,7 @@
 import { doctors } from '@/api/endpoints';
 import type { DoctorSummary } from '@/types/api';
 import { CLINIC_ADDRESS, type AssistantReply } from './assistant';
+import { matchDoctors } from './doctorNames';
 
 /**
  * The assistant, in Tamil.
@@ -75,6 +76,21 @@ const DECLINE = [
   'அப்பாயிண்ட்மென்ட் பதிவு, மருத்துவர் நேரம், கட்டணம், நினைவூட்டல், அல்லது கிளினிக் முகவரி பற்றி கேட்கலாம்.',
 ].join('\n');
 
+/**
+ * Anything that sounds like a symptom is refused, not answered.
+ *
+ * <p>The same guard the English and Hindi assistants carry. A scripted reply
+ * about opening hours to someone describing chest pain would be worse than
+ * saying nothing.
+ */
+const MEDICAL = /வலி|காய்ச்சல்|நோய்|உடம்பு|அறிகுறி|இருமல்|தலைச்சுற்றல்|மூச்சு|வாந்தி|மருந்து|சிகிச்சை/;
+
+const MEDICAL_ANSWER = [
+  'என்னால் மருத்துவ ஆலோசனை வழங்க முடியாது.',
+  'உடல்நிலை சரியில்லை என்றால் நேரடியாக கிளினிக்கைத் தொடர்பு கொள்ளவும். அவசர நிலையில் உடனே அருகிலுள்ள மருத்துவமனைக்குச் செல்லவும்.',
+  'அப்பாயிண்ட்மென்ட் பதிவு செய்ய நான் உதவ முடியும்.',
+].join('\n');
+
 /** Tappable follow-ups, in Tamil. */
 const SUGGEST = {
   book: 'அப்பாயிண்ட்மென்ட் எப்படி பதிவு செய்வது?',
@@ -94,25 +110,6 @@ function shortTime(apiTime: string): string {
   return `${period} ${clock} மணி`;
 }
 
-/**
- * Finds a doctor named in a Tamil question.
- *
- * <p>Doctor names are stored in English, and a Tamil speaker will usually type
- * or say the surname in English too ("டாக்டர் Sharma" or plain "Sharma"), so
- * the English name is matched inside the Tamil sentence.
- */
-function doctorsNamedIn(question: string, all: DoctorSummary[]): DoctorSummary[] {
-  const asked = question.toLowerCase();
-  return all.filter((doctor) => {
-    const full = doctor.name.toLowerCase();
-    const withoutTitle = full.replace(/^dr\.?\s*/, '');
-    const surname = withoutTitle.split(/\s+/).pop() ?? '';
-    return (
-      asked.includes(withoutTitle) || (surname.length > 3 && asked.includes(surname))
-    );
-  });
-}
-
 async function findDoctors(asked: string): Promise<{ matches: DoctorSummary[]; sample: string[] }> {
   const PAGE = 100;
   const MAX_PAGES = 10;
@@ -123,7 +120,7 @@ async function findDoctors(asked: string): Promise<{ matches: DoctorSummary[]; s
     if (sample.length === 0) {
       sample.push(...result.content.slice(0, 6).map((doctor) => doctor.name));
     }
-    const matches = doctorsNamedIn(asked, result.content);
+    const matches = matchDoctors(asked, result.content);
     if (matches.length > 0) {
       return { matches, sample };
     }
@@ -163,6 +160,11 @@ export async function answerTamil(question: string): Promise<AssistantReply> {
 
   if (!asked) {
     return { text: GREETING, suggestions: TAMIL_STARTERS };
+  }
+
+  // Refused before any other intent can claim it.
+  if (MEDICAL.test(asked)) {
+    return { text: MEDICAL_ANSWER, suggestions: [SUGGEST.book] };
   }
 
   if (/வணக்கம்|ஹலோ|hello|hi\b/i.test(asked)) {

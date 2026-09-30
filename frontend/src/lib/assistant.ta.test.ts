@@ -102,8 +102,16 @@ describe('Tamil intents', () => {
   });
 
   it('declines rather than inventing an answer', async () => {
-    const reply = await answerTamil('எனக்கு தலைவலி, என்ன மருந்து சாப்பிடலாம்?');
+    // Deliberately not a symptom question: those are caught earlier by the
+    // medical guard, which is a different and stronger refusal.
+    const reply = await answerTamil('உங்களுக்குப் பிடித்த நிறம் எது?');
     expect(reply.text).toContain('மன்னிக்கவும்');
+  });
+
+  it('refuses a symptom question before any other intent sees it', async () => {
+    const reply = await answerTamil('எனக்கு தலைவலி, என்ன மருந்து சாப்பிடலாம்?');
+    expect(reply.text).toContain('மருத்துவ ஆலோசனை வழங்க முடியாது');
+    expect(reply.text).toContain('மருத்துவமனை');
   });
 
   it('greets back', async () => {
