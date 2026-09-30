@@ -123,6 +123,33 @@ export async function requestForm<T>(path: string, form: FormData): Promise<T> {
   return (payload as ApiSuccess<T>).data;
 }
 
+/**
+ * A POST that returns binary rather than the standard envelope.
+ *
+ * <p>Only synthesised speech uses this. The envelope is JSON by contract, so
+ * an endpoint returning a wav cannot use it; the error path still reads the
+ * envelope, because a failure does come back as JSON.
+ */
+export async function requestAudio(path: string, form: FormData): Promise<Blob> {
+  const headers: Record<string, string> = {};
+  const token = readToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: form });
+
+  if (!response.ok) {
+    const payload = await readBody(response);
+    if (response.status === 401) {
+      onUnauthorized();
+    }
+    throw new ApiRequestError(response.status, payload as Partial<ApiError>);
+  }
+
+  return response.blob();
+}
+
 async function readBody(response: Response): Promise<unknown> {
   const text = await response.text();
   if (!text) {

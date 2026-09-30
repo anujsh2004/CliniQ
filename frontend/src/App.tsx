@@ -8,6 +8,7 @@ import { AppointmentsPage } from '@/pages/AppointmentsPage';
 import { NotificationsPage } from '@/pages/NotificationsPage';
 import { DoctorDetailPage } from '@/pages/DoctorDetailPage';
 import { DoctorsPage } from '@/pages/DoctorsPage';
+import { VoiceAssistantPage } from '@/pages/VoiceAssistantPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { AvailabilityPage } from '@/pages/AvailabilityPage';
 import { SchedulePage } from '@/pages/SchedulePage';
@@ -33,6 +34,7 @@ export function App() {
         <Route element={<AppShell />}>
           <Route path="/appointments" element={<AppointmentsPage />} />
           <Route path="/reminders" element={<NotificationsPage />} />
+          <Route path="/assistant" element={<VoiceAssistantPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
       </Route>

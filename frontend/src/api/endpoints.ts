@@ -1,4 +1,4 @@
-import { request, requestForm } from './client';
+import { request, requestAudio, requestForm } from './client';
 import type {
   Availability,
   NotificationSummary,
@@ -206,4 +206,18 @@ export const voice = {
   },
 
   languages: () => request<{ languages: string[] }>('/voice/languages'),
+
+  /**
+   * Asks the clinic's own voice model to read a reply aloud.
+   *
+   * <p>Returns audio rather than JSON, so it bypasses the envelope helpers.
+   * A failure here is not worth surfacing to the patient: the reply is
+   * already on screen, so the caller falls back to the browser's voice.
+   */
+  speak: async (text: string, language: string): Promise<Blob> => {
+    const form = new FormData();
+    form.append('text', text);
+    form.append('language', language);
+    return requestAudio('/voice/speak', form);
+  },
 };
