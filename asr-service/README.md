@@ -1,9 +1,37 @@
-# Speech recognition service
+# Voice service
 
-Tamil (and Hindi, Kannada, English) speech to text for CliniQ, using
-[AI4Bharat's IndicConformer](https://github.com/AI4Bharat/IndicConformerASR)
-600M multilingual checkpoint. MIT licensed, and it runs entirely on this
-machine.
+Speech in and speech out for CliniQ, in **Hindi, Tamil and English**. Two
+AI4Bharat models, both MIT licensed, both running entirely on this machine:
+
+| Stage | Model | Size | Languages |
+|---|---|---|---|
+| Speech to text | [IndicConformer](https://github.com/AI4Bharat/IndicConformerASR) | 600M | 22 Indian languages + English |
+| Text to speech | [IndicF5](https://huggingface.co/ai4bharat/IndicF5) | 0.4B | 11 Indian languages |
+
+IndicF5 does not cover English, so English replies are spoken by the browser
+instead — its English voices are good, instant and free, and paying a GPU to do
+worse would be waste.
+
+## Hugging Face access, first
+
+**Both models are gated.** Gating is automatic — there is no approval queue —
+but you must be signed in and have clicked through once:
+
+1. Create a free account at <https://huggingface.co/join>.
+2. Open each model page and accept the terms:
+   - <https://huggingface.co/ai4bharat/indic-conformer-600m-multilingual>
+   - <https://huggingface.co/ai4bharat/IndicF5>
+3. Create a **read** token at <https://huggingface.co/settings/tokens>.
+4. Sign in locally, once:
+
+   ```bash
+   uv run huggingface-cli login
+   ```
+
+   Paste the token when prompted. It is stored outside the repository and is
+   never committed.
+
+Without this the service exits at startup with `gated repo` / 401.
 
 ## Why it is a separate service
 
@@ -114,8 +142,11 @@ curl -X POST http://localhost:8001/transcribe \
 
 - **30 seconds** per recording, and 10 MB. A booking question is a sentence;
   anything longer is a recorder someone forgot to stop.
-- **Four languages** are enabled (`ta`, `hi`, `kn`, `en`). The checkpoint
-  supports 22, but only Tamil has been tested here, and claiming the rest
-  without testing them would be dishonest.
+- **Three languages** are enabled (`hi`, `ta`, `en`). The recogniser supports
+  22, but only these three have been tested here, and claiming the rest without
+  testing them would be dishonest.
+- **English is understood but not spoken here** — the browser speaks it.
+- **Spoken replies are capped at 600 characters.** A clinic answer is a few
+  sentences; anything longer is a bug upstream.
 - **No speaker separation and no punctuation.** The model returns a plain
   stream of words.

@@ -16,3 +16,14 @@ python-multipart>=0.0.9
 # find out.
 onnx==1.20.1
 onnxruntime==1.20.1
+
+# Text to speech: AI4Bharat IndicF5 (MIT, 0.4B). soundfile writes the wav it
+# returns; huggingface_hub fetches the reference clip the model needs to voice.
+soundfile>=0.12
+huggingface_hub>=0.25
+
+# IndicF5's remote code is an F5-TTS variant and imports these directly. They
+# are not declared by the model card, so without them the voice model fails to
+# load while the recogniser loads fine — which is exactly how it presented.
+f5_tts>=1.1
+pydub>=0.25
