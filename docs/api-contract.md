@@ -1,6 +1,6 @@
 # Clinic Management SaaS — Backend Team & API Contract
 
-**Version:** 1.4
+**Version:** 1.5
 **Authors:** Parth + Anuj | Java Spring Boot Backend
 **Status:** Binding. Endpoint shapes, the response envelope, and the canonical `ErrorCode` values
 defined here take precedence over anything improvised during implementation.
@@ -998,6 +998,18 @@ editing and deleting weekly windows, and blocking a single date for time off.
 A doctor could previously only add windows, and was told about overlaps with no
 way to see or change what caused them.
 
+### 23e. Version 1.5 Change Log
+
+Version 1.5 adds the voice endpoints in section 25: `POST /voice/transcribe`,
+`POST /voice/speak` and `GET /voice/languages`, in Hindi, Tamil and English.
+They are feature-flagged off by default and absent from the API when disabled.
+`/voice/speak` is the one endpoint that does not return the standard envelope,
+because it returns a waveform; its errors still do.
+
+Voice is read-only by design: it answers questions and refuses to book, cancel
+or advise. The speech models are CC-BY-NC and must be replaced before sale
+(D28).
+
 ### 23b. Version 1.2 Change Log
 
 Version 1.2 closes a privilege escalation in registration, and lets a doctor
@@ -1013,6 +1025,80 @@ Version 1.1 incorporates three contract clarifications: (1) appointment ownershi
 API/DTO/validation versus booking transaction/concurrency, (2) the slot response DTO is locked with
 `date` only at the top level, and (3) canonical `ErrorCode` values and the
 `SlotAlreadyBookedException` → `SLOT_ALREADY_BOOKED` → `@ControllerAdvice` integration are defined.
+
+## 25. Voice (v1.5)
+
+Speech in and speech out, for patients who would rather speak than type. Every
+model runs on the clinic's own hardware, so patient audio never leaves it.
+
+These endpoints exist **only when `clinic.speech.enabled` is true**. With the
+flag off they are absent from the API entirely rather than present and failing,
+because an endpoint that always errors is worse than an honest 404.
+
+All three require an authenticated caller: transcription costs real GPU time.
+
+### Transcribe — POST /api/v1/voice/transcribe
+
+`multipart/form-data`:
+
+| Field | Required | Notes |
+|---|---|---|
+| `audio` | yes | The recording, as the browser captured it. WebM/Opus and wav both work. Max 10 MB, 30 seconds. |
+| `language` | no | `hi`, `ta` or `en`. Defaults to `hi`. |
+
+```json
+{
+  "success": true,
+  "message": "Audio transcribed successfully",
+  "data": {
+    "text": "डॉक्टर शर्मा का समय क्या है",
+    "language": "hi",
+    "decoder": "rnnt",
+    "durationSeconds": 2.21,
+    "elapsedMs": 617
+  }
+}
+```
+
+Failures use the standard envelope: `422 VALIDATION_ERROR` for an empty or
+silent recording, an oversized upload, or an unsupported language; `503` when
+the speech service is not running.
+
+### Speak — POST /api/v1/voice/speak
+
+`multipart/form-data` with `text` and `language`. Returns **`audio/wav`**
+rather than the standard envelope — the envelope is JSON by contract, and a
+waveform cannot travel inside it. Errors still use the envelope.
+
+Replies are capped at **600 characters**. A clinic answer is a few sentences;
+anything longer indicates a bug upstream.
+
+### Languages — GET /api/v1/voice/languages
+
+```json
+{ "success": true, "data": { "languages": ["hi", "ta", "en"] } }
+```
+
+Read from configuration so the browser never offers a language the service
+will then refuse.
+
+### Models
+
+| Stage | Model | Licence |
+|---|---|---|
+| Hindi/Tamil recognition | `ai4bharat/indic-conformer-600m-multilingual` | MIT |
+| English recognition | `openai/whisper-small` | MIT |
+| Hindi/Tamil/English speech | `facebook/mms-tts-{hin,tam,eng}` | **CC-BY-NC** |
+
+The speech models are **non-commercial** and must be replaced before CliniQ is
+sold. Tracked as decision D28.
+
+### What voice deliberately does not do
+
+It answers questions. It does **not** book, cancel or reschedule, and it does
+not give medical advice. Recognition mishears — "अपॉइंटमेंट" is routinely
+garbled — and a misheard cancellation would destroy a real appointment. Acting
+on speech requires a spoken confirmation step, which is a later phase.
 
 ## 24. Versioning
 

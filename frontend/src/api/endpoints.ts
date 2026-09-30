@@ -1,4 +1,4 @@
-import { request } from './client';
+import { request, requestAudio, requestForm } from './client';
 import type {
   Availability,
   NotificationSummary,
@@ -180,4 +180,44 @@ export const notifications = {
     request<void>(`/notifications/${notificationId}/read`, { method: 'PATCH' }),
 
   markAllRead: () => request<void>('/notifications/read-all', { method: 'PATCH' }),
+};
+
+export interface Transcript {
+  text: string;
+  language: string;
+  decoder: string;
+  durationSeconds: number;
+  elapsedMs: number;
+}
+
+export const voice = {
+  /**
+   * Sends a recording to the clinic's own speech model.
+   *
+   * <p>Defaults to Tamil: this endpoint exists because typing Tamil on a phone
+   * is slow, so a patient reaching for the microphone is overwhelmingly likely
+   * to be speaking it.
+   */
+  transcribe: (audio: Blob, language = 'ta') => {
+    const form = new FormData();
+    form.append('audio', audio, 'recording.webm');
+    form.append('language', language);
+    return requestForm<Transcript>('/voice/transcribe', form);
+  },
+
+  languages: () => request<{ languages: string[] }>('/voice/languages'),
+
+  /**
+   * Asks the clinic's own voice model to read a reply aloud.
+   *
+   * <p>Returns audio rather than JSON, so it bypasses the envelope helpers.
+   * A failure here is not worth surfacing to the patient: the reply is
+   * already on screen, so the caller falls back to the browser's voice.
+   */
+  speak: async (text: string, language: string): Promise<Blob> => {
+    const form = new FormData();
+    form.append('text', text);
+    form.append('language', language);
+    return requestAudio('/voice/speak', form);
+  },
 };

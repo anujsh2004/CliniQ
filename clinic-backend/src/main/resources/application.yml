@@ -2,6 +2,13 @@ spring:
   application:
     name: clinic-backend
 
+  # Voice questions are short recordings. The cap is well under the service's
+  # own 30-second limit so an oversized upload is refused before it is buffered.
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
+
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5433/clinic_db}
     username: ${DB_USERNAME:clinic_user}
@@ -119,6 +126,18 @@ clinic:
     # checkout does not keep a slot off the market all day.
     duration: ${CLINIC_HOLD_DURATION:5m}
     sweep-cron: ${CLINIC_HOLD_SWEEP_CRON:*/30 * * * * *}
+
+  speech:
+    # Off by default: the model is a 2.5 GB download, and a checkout without it
+    # must still start and serve every other endpoint. Turn it on only where
+    # the Python service in asr-service/ is running.
+    enabled: ${CLINIC_SPEECH_ENABLED:false}
+    base-url: ${CLINIC_SPEECH_URL:http://localhost:8001}
+    # Generous, because the first request after startup pays for the model's
+    # warm-up and a timeout there reads as broken rather than slow.
+    timeout: ${CLINIC_SPEECH_TIMEOUT:60s}
+    # Hindi and Tamil are recognised by IndicConformer, English by Whisper.
+    languages: [ hi, ta, en ]
 
   payments:
     razorpay:
