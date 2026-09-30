@@ -21,6 +21,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -35,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(SecuritySliceTestConfig.class)
 @TestPropertySource(properties = {
         "clinic.speech.enabled=true",
-        "clinic.speech.languages=ta,hi,kn,en",
+        "clinic.speech.languages=hi,ta,en",
 })
 class VoiceControllerTest {
 
@@ -71,16 +73,16 @@ class VoiceControllerTest {
 
     @Test
     @WithMockUser(roles = "PATIENT")
-    void defaultsToTamilWhenNoLanguageIsGiven() throws Exception {
-        // Tamil is the language this was built for, and the commonest reason a
-        // patient reaches for the microphone at all.
-        when(speechClient.transcribe(any(), any(), eq("ta")))
-                .thenReturn(new Transcript("வணக்கம்", "ta", "rnnt", 1.0, 300));
+    void defaultsToHindiWhenNoLanguageIsGiven() throws Exception {
+        // Hindi is the most widely spoken of the three, so it is the sensible
+        // default for a patient who has not chosen.
+        when(speechClient.transcribe(any(), any(), eq("hi")))
+                .thenReturn(new Transcript("नमस्ते", "hi", "rnnt", 1.0, 300));
 
         mockMvc.perform(multipart("/api/v1/voice/transcribe").file(recording()))
                 .andExpect(status().isOk());
 
-        verify(speechClient).transcribe(any(), any(), eq("ta"));
+        verify(speechClient).transcribe(any(), any(), eq("hi"));
     }
 
     @Test
@@ -136,6 +138,64 @@ class VoiceControllerTest {
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .get("/api/v1/voice/languages"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.languages[0]").value("ta"));
+                .andExpect(jsonPath("$.data.languages[0]").value("hi"));
+    }
+
+    @Test
+    @WithMockUser(roles = "PATIENT")
+    void voicesAHindiReply() throws Exception {
+        when(speechClient.speak(eq("नमस्ते"), eq("hi"))).thenReturn(new byte[] {82, 73, 70, 70});
+
+        mockMvc.perform(post("/api/v1/voice/speak")
+                        .param("text", "नमस्ते")
+                        .param("language", "hi"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("audio/wav"));
+    }
+
+    @Test
+    @WithMockUser(roles = "PATIENT")
+    void voicesEnglishToo() throws Exception {
+        // All three languages are voiced by the clinic's own models, so a
+        // patient hears the same voice whichever they pick.
+        when(speechClient.speak(eq("Hello"), eq("en"))).thenReturn(new byte[] {82, 73, 70, 70});
+
+        mockMvc.perform(post("/api/v1/voice/speak")
+                        .param("text", "Hello")
+                        .param("language", "en"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("audio/wav"));
+    }
+
+    @Test
+    @WithMockUser(roles = "PATIENT")
+    void refusesToVoiceALanguageWeHaveNoModelFor() throws Exception {
+        mockMvc.perform(post("/api/v1/voice/speak")
+                        .param("text", "Bonjour")
+                        .param("language", "fr"))
+                .andExpect(status().isUnprocessableEntity());
+
+        verify(speechClient, never()).speak(any(), any());
+    }
+
+    @Test
+    @WithMockUser(roles = "PATIENT")
+    void refusesToVoiceAnEntirePage() throws Exception {
+        mockMvc.perform(post("/api/v1/voice/speak")
+                        .param("text", "क".repeat(601))
+                        .param("language", "hi"))
+                .andExpect(status().isUnprocessableEntity());
+
+        verify(speechClient, never()).speak(any(), any());
+    }
+
+    @Test
+    void refusesToVoiceAnythingForAStranger() throws Exception {
+        mockMvc.perform(post("/api/v1/voice/speak")
+                        .param("text", "नमस्ते")
+                        .param("language", "hi"))
+                .andExpect(status().isUnauthorized());
+
+        verify(speechClient, never()).speak(any(), any());
     }
 }

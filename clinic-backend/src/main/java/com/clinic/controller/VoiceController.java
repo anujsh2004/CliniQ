@@ -6,6 +6,7 @@ import com.clinic.exception.FieldValidationException;
 import com.clinic.speech.SpeechClient;
 import com.clinic.speech.Transcript;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,6 +38,12 @@ import java.util.Map;
 @PreAuthorize("isAuthenticated()")
 public class VoiceController {
 
+    /** Languages the clinic's own voice model can speak. */
+    private static final List<String> SPOKEN_LANGUAGES = List.of("hi", "ta", "en");
+
+    /** A spoken clinic answer is a few sentences, not a page. */
+    private static final int MAX_SPOKEN_CHARS = 600;
+
     private final SpeechClient speechClient;
     private final SpeechProperties properties;
 
@@ -49,13 +56,13 @@ public class VoiceController {
      * Turns a recording into text.
      *
      * @param audio    the recording, as the browser captured it
-     * @param language an ISO code; defaults to Tamil, the language this was
-     *                 built and tested for
+     * @param language an ISO code; defaults to Hindi, the most widely spoken
+     *                 of the three this clinic supports
      */
     @PostMapping(path = "/transcribe", consumes = "multipart/form-data")
     public ResponseEntity<ApiResponse<Transcript>> transcribe(
             @RequestParam("audio") MultipartFile audio,
-            @RequestParam(name = "language", defaultValue = "ta") String language) {
+            @RequestParam(name = "language", defaultValue = "hi") String language) {
 
         if (audio.isEmpty()) {
             throw new FieldValidationException("audio", "Record something before sending it.");
@@ -82,6 +89,35 @@ public class VoiceController {
 
         Transcript transcript = speechClient.transcribe(bytes, filename, language);
         return ResponseEntity.ok(ApiResponse.success("Audio transcribed successfully", transcript));
+    }
+
+    /**
+     * Reads a reply aloud, returning a wav.
+     *
+     * <p>All three languages are voiced by the clinic's own models, so a
+     * patient hears the same voice whichever they choose rather than a
+     * different one per machine.
+     */
+    @PostMapping(path = "/speak", produces = "audio/wav")
+    public ResponseEntity<byte[]> speak(
+            @RequestParam("text") String text,
+            @RequestParam(name = "language", defaultValue = "hi") String language) {
+
+        if (text == null || text.isBlank()) {
+            throw new FieldValidationException("text", "There is nothing to say.");
+        }
+        if (text.length() > MAX_SPOKEN_CHARS) {
+            throw new FieldValidationException("text",
+                    "Replies are limited to " + MAX_SPOKEN_CHARS + " characters.");
+        }
+        if (!SPOKEN_LANGUAGES.contains(language)) {
+            throw new FieldValidationException("language",
+                    "Spoken replies are available in: " + String.join(", ", SPOKEN_LANGUAGES));
+        }
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.valueOf("audio/wav"))
+                .body(speechClient.speak(text, language));
     }
 
     /**

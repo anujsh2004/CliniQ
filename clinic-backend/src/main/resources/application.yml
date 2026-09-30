@@ -136,7 +136,8 @@ clinic:
     # Generous, because the first request after startup pays for the model's
     # warm-up and a timeout there reads as broken rather than slow.
     timeout: ${CLINIC_SPEECH_TIMEOUT:60s}
-    languages: [ ta, hi, kn, en ]
+    # Hindi and Tamil are recognised by IndicConformer, English by Whisper.
+    languages: [ hi, ta, en ]
 
   payments:
     razorpay:

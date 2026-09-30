@@ -113,6 +113,19 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * The speech service refused the request and explained why.
+     *
+     * <p>422 with its own words: a silent recording or the wrong language is
+     * something the patient can act on, and only the service knows which.
+     */
+    @ExceptionHandler(com.clinic.speech.SpeechRejectedException.class)
+    public ResponseEntity<ErrorResponse> handleSpeechRejected(
+            com.clinic.speech.SpeechRejectedException ex) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(ErrorResponse.of(ErrorCode.VALIDATION_ERROR, ex.getMessage()));
+    }
+
+    /**
      * The speech service is not reachable.
      *
      * <p>503 rather than 500: nothing is wrong with the request, and the

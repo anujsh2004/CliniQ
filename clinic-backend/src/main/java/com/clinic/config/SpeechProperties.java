@@ -17,7 +17,7 @@ import java.util.List;
  *   speech:
  *     enabled: true
  *     base-url: http://localhost:8001
- *     languages: [ ta, hi, kn, en ]
+ *     languages: [ hi, ta, en ]
  * </pre>
  */
 @ConfigurationProperties(prefix = "clinic.speech")
@@ -35,7 +35,7 @@ public record SpeechProperties(
         // rather than a slow one.
         timeout = timeout == null ? Duration.ofSeconds(60) : timeout;
         languages = languages == null || languages.isEmpty()
-                ? List.of("ta", "hi", "kn", "en")
+                ? List.of("hi", "ta", "en")
                 : languages;
         maxUploadBytes = maxUploadBytes <= 0 ? 10L * 1024 * 1024 : maxUploadBytes;
     }

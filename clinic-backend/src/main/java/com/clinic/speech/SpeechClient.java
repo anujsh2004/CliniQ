@@ -1,6 +1,8 @@
 package com.clinic.speech;
 
 import com.clinic.config.SpeechProperties;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ByteArrayResource;
@@ -9,6 +11,8 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestClientException;
 
 /**
@@ -46,6 +50,84 @@ public class SpeechClient {
     }
 
     /**
+     * Asks the service to voice a reply, returning wav bytes.
+     *
+     * <p>Failure is not fatal anywhere upstream: the reply is already on the
+     * patient's screen, so losing the audio costs them nothing.
+     */
+    public byte[] speak(String text, String language) {
+        MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
+        form.add("text", text);
+        form.add("language", language);
+
+        try {
+            byte[] wav = restClient.post()
+                    .uri("/speak")
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(form)
+                    .retrieve()
+                    .body(byte[].class);
+
+            if (wav == null || wav.length == 0) {
+                throw new SpeechUnavailableException("The speech service returned no audio.");
+            }
+            return wav;
+        } catch (ResourceAccessException exception) {
+            throw notRunning(exception);
+        } catch (RestClientResponseException exception) {
+            throw rejected(exception);
+        } catch (RestClientException exception) {
+            throw failed("speak", exception);
+        }
+    }
+
+    /**
+     * The service is not listening at all.
+     *
+     * <p>Distinguished from a service that answered with an error, because the
+     * two need completely different fixes and conflating them cost real
+     * debugging time: a request the model rejected was reported as the service
+     * being down, which sent everyone looking in the wrong place.
+     */
+    private SpeechUnavailableException notRunning(Exception cause) {
+        log.warn("Speech service at {} is not reachable: {}",
+                properties.baseUrl(), cause.getMessage());
+        return new SpeechUnavailableException(
+                "The speech service is not running. Start it and try again.", cause);
+    }
+
+    /**
+     * The service refused the request and said why.
+     *
+     * <p>Its reason is passed through verbatim. FastAPI puts it in a
+     * {@code detail} field; if that cannot be read the status line is better
+     * than nothing, but the reason is what the patient actually needs.
+     */
+    private SpeechRejectedException rejected(RestClientResponseException exception) {
+        String detail = exception.getResponseBodyAsString();
+        String reason;
+        try {
+            JsonNode body = new ObjectMapper().readTree(detail);
+            reason = body.path("detail").asText(detail);
+        } catch (Exception ignored) {
+            reason = detail;
+        }
+        if (reason == null || reason.isBlank()) {
+            reason = "The speech service refused that request.";
+        }
+        log.warn("Speech service refused the request: {}", reason);
+        return new SpeechRejectedException(reason, exception);
+    }
+
+    /** The service answered, but could not do what was asked. */
+    private SpeechUnavailableException failed(String what, Exception cause) {
+        log.warn("Speech service could not {}: {}", what, cause.getMessage());
+        return new SpeechUnavailableException(
+                "The speech service could not handle that request. "
+                        + "Check the service log for details.", cause);
+    }
+
+    /**
      * Transcribes a recording.
      *
      * @param audio    the raw upload, in whatever format the browser recorded
@@ -76,14 +158,12 @@ public class SpeechClient {
             log.info("Transcribed {} bytes of {} in {}ms",
                     audio.length, language, transcript.elapsedMs());
             return transcript;
+        } catch (ResourceAccessException exception) {
+            throw notRunning(exception);
+        } catch (RestClientResponseException exception) {
+            throw rejected(exception);
         } catch (RestClientException exception) {
-            // The commonest cause by far is the sidecar simply not running,
-            // which is a deployment state rather than a bug, so it is logged
-            // as a warning and surfaced as a clear message.
-            log.warn("Speech service at {} did not answer: {}",
-                    properties.baseUrl(), exception.getMessage());
-            throw new SpeechUnavailableException(
-                    "The speech service is not running. Start it and try again.", exception);
+            throw failed("transcribe", exception);
         }
     }
 }
