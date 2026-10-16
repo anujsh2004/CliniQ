@@ -3,7 +3,9 @@ spring:
     name: clinic-backend
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5433/clinic_db}
+    # DB_URL wins when set; otherwise it is assembled from parts, which is how
+    # Render hands over a managed database (render.yaml).
+    url: ${DB_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:clinic_db}}
     username: ${DB_USERNAME:clinic_user}
     password: ${DB_PASSWORD:clinic_pass}
     driver-class-name: org.postgresql.Driver
@@ -49,8 +51,14 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME:clinic_user}
     password: ${RABBITMQ_PASSWORD:clinic_pass}
+    # Fail fast when the broker is unreachable, so a reminder sweep does not
+    # hang on it. A hosted broker (e.g. CloudAMQP) is set with
+    # SPRING_RABBITMQ_ADDRESSES=amqps://user:pass@host/vhost.
+    connection-timeout: ${RABBITMQ_CONNECTION_TIMEOUT:5s}
     listener:
       simple:
+        # Off where no broker is deployed; reminders then stay QUEUED.
+        auto-startup: ${RABBITMQ_LISTENER_ENABLED:true}
         # A delivery that keeps failing is retried with backoff and then dead
         # lettered, rather than spinning forever and starving the queue.
         default-requeue-rejected: false
@@ -110,7 +118,8 @@ springdoc:
     operations-sorter: method
 
 server:
-  port: ${SERVER_PORT:8080}
+  # Render injects PORT.
+  port: ${PORT:${SERVER_PORT:8080}}
 
 management:
   endpoints:
