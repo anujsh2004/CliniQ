@@ -4,7 +4,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://cliniq-backend.onrender.com/api/:path*" },
+    { "source": "/api/:path*", "destination": "https://cliniq-backend-sjj0.onrender.com/api/:path*" },
     { "source": "/((?!assets/).*)", "destination": "/index.html" }
   ]
 }

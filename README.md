@@ -52,4 +52,4 @@ docs/              Binding API contract and supporting engineering docs
 - **Frontend (Vercel):** import the repository with *Root Directory* `frontend`.
   `frontend/vercel.json` proxies `/api/*` to the Render service, so the SPA keeps
   calling its own origin and no CORS setup is needed. If the Render service URL
-  differs from `https://cliniq-backend.onrender.com`, update the rewrite.
+  differs from `https://cliniq-backend-sjj0.onrender.com`, update the rewrite.
