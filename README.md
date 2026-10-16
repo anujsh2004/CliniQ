@@ -42,3 +42,14 @@ docs/              Binding API contract and supporting engineering docs
 - Java filenames match class names exactly.
 - DTOs at the API boundary; JPA entities are never exposed directly.
 - JWT secrets and database credentials are never committed.
+
+## Deployment
+
+- **Backend (Render):** `render.yaml` is a Blueprint for the API, Postgres and Redis.
+  In Render choose *New → Blueprint* and pick this repository. RabbitMQ is not
+  provisioned; reminders stay `QUEUED` until `SPRING_RABBITMQ_ADDRESSES` points at a
+  hosted broker and `RABBITMQ_LISTENER_ENABLED=true`.
+- **Frontend (Vercel):** import the repository with *Root Directory* `frontend`.
+  `frontend/vercel.json` proxies `/api/*` to the Render service, so the SPA keeps
+  calling its own origin and no CORS setup is needed. If the Render service URL
+  differs from `https://cliniq-backend.onrender.com`, update the rewrite.

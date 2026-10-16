@@ -1,0 +1,52 @@
+# Render Blueprint: the Spring Boot API with its Postgres and Redis.
+# RabbitMQ has no Render-managed offering, so the reminder listener is off by
+# default; point SPRING_RABBITMQ_ADDRESSES at a hosted broker and set
+# RABBITMQ_LISTENER_ENABLED=true to turn it on.
+databases:
+  - name: cliniq-db
+    plan: free
+    databaseName: clinic_db
+    user: clinic_user
+    postgresMajorVersion: "16"
+
+services:
+  - type: keyvalue
+    name: cliniq-redis
+    plan: free
+    ipAllowList: []
+
+  - type: web
+    name: cliniq-backend
+    runtime: docker
+    plan: free
+    rootDir: clinic-backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: DB_HOST
+        fromDatabase: { name: cliniq-db, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: cliniq-db, property: port }
+      - key: DB_NAME
+        fromDatabase: { name: cliniq-db, property: database }
+      - key: DB_USERNAME
+        fromDatabase: { name: cliniq-db, property: user }
+      - key: DB_PASSWORD
+        fromDatabase: { name: cliniq-db, property: password }
+      - key: REDIS_HOST
+        fromService: { type: keyvalue, name: cliniq-redis, property: host }
+      - key: REDIS_PORT
+        fromService: { type: keyvalue, name: cliniq-redis, property: port }
+      - key: CLINIC_JWT_SECRET
+        generateValue: true
+      - key: RAZORPAY_WEBHOOK_SECRET
+        generateValue: true
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RABBITMQ_LISTENER_ENABLED
+        value: "false"
+      # The free instance has 512 MB; keep the heap inside it.
+      - key: JAVA_TOOL_OPTIONS
+        value: -XX:MaxRAMPercentage=75 -XX:+UseSerialGC
