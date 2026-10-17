@@ -4,11 +4,13 @@ import { ApiRequestError } from '@/api/client';
 import { doctors } from '@/api/endpoints';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, ErrorState, SkeletonRows } from '@/components/States';
 import { useToast } from '@/components/Toast';
 import { useAuth } from '@/context/AuthContext';
 import { formatTime } from '@/lib/format';
+import type { Availability } from '@/types/api';
 
 const DAYS = [
   'MONDAY',
@@ -36,10 +38,22 @@ const INITIAL: FormState = {
   slotDurationMinutes: 30,
 };
 
+function titleCase(day: string): string {
+  return day.charAt(0) + day.slice(1).toLowerCase();
+}
+
+/** "09:00:00" as it comes from the API, "09:00" as a time input wants it. */
+function toInputTime(apiTime: string): string {
+  return apiTime.slice(0, 5);
+}
+
 /**
- * design.md 4.4: the doctor defines a recurring weekly window, and the backend
- * turns it into concrete slots. The ordering rule is checked here as well as on
- * the server, so an obvious mistake does not cost a round trip.
+ * design.md 4.4: the doctor defines recurring weekly windows, and the backend
+ * turns them into concrete slots.
+ *
+ * <p>The existing windows are listed first, deliberately. Without them the
+ * overlap error - "this window overlaps availability already defined" - names a
+ * problem the doctor cannot see or act on.
  */
 export function AvailabilityPage() {
   const toast = useToast();
@@ -48,6 +62,9 @@ export function AvailabilityPage() {
 
   const [form, setForm] = useState<FormState>(INITIAL);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [editing, setEditing] = useState<Availability | null>(null);
+  const [removing, setRemoving] = useState<Availability | null>(null);
+  const [timeOffDate, setTimeOffDate] = useState('');
 
   // The doctor's own profile, from the server rather than guessed. An admin
   // has no single profile to edit, which is why the page asks them to pick a
@@ -63,34 +80,102 @@ export function AvailabilityPage() {
 
   const doctorId = profile.data?.doctorId;
 
+  const windows = useQuery({
+    queryKey: ['availability', doctorId],
+    queryFn: () => doctors.availability(doctorId!),
+    enabled: Boolean(doctorId),
+  });
+
   const slotsPreview = useQuery({
     queryKey: ['availability-preview', doctorId],
     queryFn: () => doctors.slots(doctorId!, new Date().toISOString().slice(0, 10)),
     enabled: Boolean(doctorId),
   });
 
-  const create = useMutation({
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ['availability'] });
+    void queryClient.invalidateQueries({ queryKey: ['availability-preview'] });
+    void queryClient.invalidateQueries({ queryKey: ['slots'] });
+  };
+
+  const reportError = (error: unknown) => {
+    if (error instanceof ApiRequestError && error.fieldErrors.length > 0) {
+      setFieldErrors(Object.fromEntries(error.fieldErrors.map((e) => [e.field, e.message])));
+      return;
+    }
+    toast.error(error instanceof ApiRequestError ? error.message : 'Could not reach the server.');
+  };
+
+  const body = () => ({
+    dayOfWeek: form.dayOfWeek,
+    startTime: `${form.startTime}:00`,
+    endTime: `${form.endTime}:00`,
+    slotDurationMinutes: form.slotDurationMinutes,
+  });
+
+  const save = useMutation({
     mutationFn: () =>
-      doctors.addAvailability(doctorId!, {
-        dayOfWeek: form.dayOfWeek,
-        startTime: `${form.startTime}:00`,
-        endTime: `${form.endTime}:00`,
-        slotDurationMinutes: form.slotDurationMinutes,
-      }),
+      editing
+        ? doctors.updateAvailability(doctorId!, editing.availabilityId, body())
+        : doctors.addAvailability(doctorId!, body()),
     onSuccess: () => {
-      toast.success('Availability saved. Slots are bookable now.');
+      toast.success(
+        editing ? 'Window updated. Slots regenerated.' : 'Availability saved. Slots are bookable now.',
+      );
       setFieldErrors({});
-      void queryClient.invalidateQueries({ queryKey: ['slots'] });
-      void queryClient.invalidateQueries({ queryKey: ['availability-preview'] });
+      setEditing(null);
+      setForm(INITIAL);
+      refresh();
+    },
+    onError: reportError,
+  });
+
+  const remove = useMutation({
+    mutationFn: (availabilityId: string) => doctors.deleteAvailability(doctorId!, availabilityId),
+    onSuccess: () => {
+      toast.success('Window removed.');
+      setRemoving(null);
+      refresh();
     },
     onError: (error) => {
-      if (error instanceof ApiRequestError && error.fieldErrors.length > 0) {
-        setFieldErrors(Object.fromEntries(error.fieldErrors.map((e) => [e.field, e.message])));
-        return;
-      }
-      toast.error(error instanceof ApiRequestError ? error.message : 'Could not reach the server.');
+      setRemoving(null);
+      toast.error(
+        error instanceof ApiRequestError ? error.message : 'Could not remove that window.',
+      );
     },
   });
+
+  const takeTimeOff = useMutation({
+    mutationFn: () => doctors.timeOff(doctorId!, timeOffDate),
+    onSuccess: (result) => {
+      const stillBooked = result.appointmentsToReschedule;
+      toast.success(
+        stillBooked > 0
+          ? `${result.slotsBlocked} slots blocked. ${stillBooked} already booked — contact those patients.`
+          : `${result.slotsBlocked} slots blocked for that date.`,
+      );
+      setTimeOffDate('');
+      refresh();
+    },
+    onError: reportError,
+  });
+
+  const startEditing = (window: Availability) => {
+    setEditing(window);
+    setFieldErrors({});
+    setForm({
+      dayOfWeek: window.dayOfWeek,
+      startTime: toInputTime(window.startTime),
+      endTime: toInputTime(window.endTime),
+      slotDurationMinutes: window.slotDurationMinutes,
+    });
+  };
+
+  const cancelEditing = () => {
+    setEditing(null);
+    setFieldErrors({});
+    setForm(INITIAL);
+  };
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -100,7 +185,7 @@ export function AvailabilityPage() {
       return;
     }
     setFieldErrors({});
-    create.mutate();
+    save.mutate();
   };
 
   if (profile.isPending) {
@@ -134,7 +219,9 @@ export function AvailabilityPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <h2 className="text-cardTitle text-text-primary">Add a weekly window</h2>
+          <h2 className="text-cardTitle text-text-primary">
+            {editing ? `Edit ${titleCase(editing.dayOfWeek)} window` : 'Add a weekly window'}
+          </h2>
           <form className="mt-4 flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
             <div className="flex flex-col gap-1">
               <label htmlFor="dayOfWeek" className="text-meta font-medium text-text-secondary">
@@ -148,7 +235,7 @@ export function AvailabilityPage() {
               >
                 {DAYS.map((day) => (
                   <option key={day} value={day}>
-                    {day.charAt(0) + day.slice(1).toLowerCase()}
+                    {titleCase(day)}
                   </option>
                 ))}
               </select>
@@ -216,15 +303,106 @@ export function AvailabilityPage() {
             {fieldErrors.startTime && (
               <p role="alert" className="text-meta text-danger">
                 {fieldErrors.startTime}
+                {!editing && ' — edit or remove it in the list beside this form.'}
               </p>
             )}
 
-            <div className="flex justify-end">
-              <Button type="submit" loading={create.isPending}>
-                {create.isPending ? 'Saving…' : 'Save availability'}
+            <div className="flex justify-end gap-2">
+              {editing && (
+                <Button type="button" variant="secondary" onClick={cancelEditing}>
+                  Cancel
+                </Button>
+              )}
+              <Button type="submit" loading={save.isPending}>
+                {save.isPending ? 'Saving…' : editing ? 'Update window' : 'Save availability'}
               </Button>
             </div>
           </form>
+        </Card>
+
+        <Card>
+          <h2 className="text-cardTitle text-text-primary">Your weekly hours</h2>
+          <p className="mt-1 text-meta text-text-secondary">
+            Every window you have defined. Edit or remove one to make room for another.
+          </p>
+
+          <div className="mt-4">
+            {windows.isPending && <SkeletonRows rows={3} />}
+            {windows.isError && (
+              <ErrorState
+                message="We could not load your hours."
+                onRetry={() => void windows.refetch()}
+              />
+            )}
+            {windows.data?.length === 0 && (
+              <EmptyState
+                title="No hours set yet"
+                description="Add a weekly window and patients can start booking."
+              />
+            )}
+            {windows.data && windows.data.length > 0 && (
+              <ul className="flex flex-col divide-y divide-border">
+                {windows.data.map((window) => (
+                  <li
+                    key={window.availabilityId}
+                    className="flex items-center justify-between gap-3 py-3"
+                  >
+                    <div>
+                      <p className="text-body font-medium text-text-primary">
+                        {titleCase(window.dayOfWeek)}
+                      </p>
+                      <p className="tabular text-meta text-text-secondary">
+                        {formatTime(window.startTime)} – {formatTime(window.endTime)} ·{' '}
+                        {window.slotDurationMinutes} min appointments
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <Button variant="secondary" onClick={() => startEditing(window)}>
+                        Edit
+                      </Button>
+                      <Button variant="secondary" onClick={() => setRemoving(window)}>
+                        Remove
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </Card>
+
+        <Card>
+          <h2 className="text-cardTitle text-text-primary">Take a day off</h2>
+          <p className="mt-1 text-meta text-text-secondary">
+            Blocks one date without changing your weekly hours. Appointments already booked are left
+            alone, and you are told how many need rescheduling.
+          </p>
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1">
+              <label htmlFor="timeOffDate" className="text-meta font-medium text-text-secondary">
+                Date
+              </label>
+              <input
+                id="timeOffDate"
+                type="date"
+                value={timeOffDate}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(event) => setTimeOffDate(event.target.value)}
+                aria-invalid={fieldErrors.date ? true : undefined}
+                className={`rounded-card border bg-surface px-3 py-2 text-body ${
+                  fieldErrors.date ? 'border-danger' : 'border-border'
+                }`}
+              />
+              {fieldErrors.date && <p className="text-meta text-danger">{fieldErrors.date}</p>}
+            </div>
+            <Button
+              onClick={() => takeTimeOff.mutate()}
+              loading={takeTimeOff.isPending}
+              disabled={!timeOffDate}
+            >
+              {takeTimeOff.isPending ? 'Blocking…' : 'Block this date'}
+            </Button>
+          </div>
         </Card>
 
         <Card>
@@ -234,30 +412,45 @@ export function AvailabilityPage() {
           </p>
           <div className="mt-4">
             {slotsPreview.isPending && <SkeletonRows rows={3} />}
-            {slotsPreview.isSuccess &&
-              (slotsPreview.data.slots.length === 0 ? (
-                <EmptyState
-                  title="No slots today"
-                  description="Add a window for today and slots appear immediately."
-                />
-              ) : (
-                <ul className="flex flex-col gap-2">
-                  {slotsPreview.data.slots.map((slot) => (
-                    <li
-                      key={slot.slotId}
-                      className="flex items-center justify-between rounded-card border border-border px-3 py-2"
-                    >
-                      <span className="tabular text-body">
-                        {formatTime(slot.startTime)}–{formatTime(slot.endTime)}
-                      </span>
-                      <span className="text-meta text-text-secondary">{slot.status}</span>
-                    </li>
-                  ))}
-                </ul>
-              ))}
+            {slotsPreview.data?.slots.length === 0 && (
+              <EmptyState
+                title="Nothing bookable today"
+                description="Either you do not work today, or the day is fully booked."
+              />
+            )}
+            {slotsPreview.data && slotsPreview.data.slots.length > 0 && (
+              <ul className="flex flex-wrap gap-2">
+                {slotsPreview.data.slots.map((slot) => (
+                  <li
+                    key={slot.slotId}
+                    className="tabular rounded-pill border border-border px-3 py-1 text-meta text-text-secondary"
+                  >
+                    {formatTime(slot.startTime)}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </Card>
       </div>
+
+      {removing && (
+        <ConfirmDialog
+          title="Remove this window?"
+          confirmLabel={remove.isPending ? 'Removing…' : 'Remove window'}
+          destructive
+          loading={remove.isPending}
+          onCancel={() => setRemoving(null)}
+          onConfirm={() => remove.mutate(removing.availabilityId)}
+        >
+          <p className="text-body text-text-secondary">
+            {titleCase(removing.dayOfWeek)} {formatTime(removing.startTime)}–
+            {formatTime(removing.endTime)} will stop generating slots. Appointments already booked
+            are never removed this way.
+          </p>
+        </ConfirmDialog>
+      )}
+
     </>
   );
 }

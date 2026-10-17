@@ -52,4 +52,9 @@ public interface SlotRepository extends JpaRepository<Slot, UUID> {
     int expirePastAvailableSlots(@Param("today") LocalDate today, @Param("now") LocalTime now);
 
     long countByDoctorIdAndStatus(UUID doctorId, SlotStatus status);
+
+    /** Slots on or after a date, for reworking a changed availability window. */
+    List<Slot> findByDoctorIdAndDateGreaterThanEqual(UUID doctorId, LocalDate from);
+
+    List<Slot> findByDoctorIdAndDate(UUID doctorId, LocalDate date);
 }

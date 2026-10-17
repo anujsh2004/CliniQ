@@ -1,6 +1,6 @@
 # Clinic Management SaaS — Backend Team & API Contract
 
-**Version:** 1.2
+**Version:** 1.3
 **Authors:** Parth + Anuj | Java Spring Boot Backend
 **Status:** Binding. Endpoint shapes, the response envelope, and the canonical `ErrorCode` values
 defined here take precedence over anything improvised during implementation.
@@ -462,6 +462,65 @@ Response:
 }
 ```
 
+### GET /api/v1/doctors/{doctorId}/availability
+
+Every weekly window the doctor has defined. **Added in v1.3.** Without it a
+doctor is told a new window "overlaps availability already defined" with no way
+to see, change or remove what is in the way.
+
+```json
+{
+  "success": true,
+  "message": "Availability fetched successfully",
+  "data": [
+    {
+      "availabilityId": "uuid",
+      "doctorId": "uuid",
+      "dayOfWeek": "MONDAY",
+      "startTime": "09:00:00",
+      "endTime": "17:00:00",
+      "slotDurationMinutes": 30
+    }
+  ]
+}
+```
+
+### PUT /api/v1/doctors/{doctorId}/availability/{availabilityId}
+
+Replaces one window. Same request body as `POST`. **Added in v1.3.**
+
+Overlap is checked against the doctor's *other* windows, so a window can be
+edited without colliding with itself. Slots already generated from the old
+window are regenerated: future slots that no longer fall inside any window are
+removed unless they are booked, and booked slots are always kept.
+
+### DELETE /api/v1/doctors/{doctorId}/availability/{availabilityId}
+
+Removes a window and its future unbooked slots. **Added in v1.3.**
+Returns `409 SLOT_ALREADY_BOOKED` if the window has booked slots in the future,
+since silently cancelling patients is never the right default. Cancel those
+appointments first.
+
+### POST /api/v1/doctors/{doctorId}/time-off
+
+Blocks a single date, for a holiday or a conference, without touching the weekly
+pattern. **Added in v1.3.**
+
+```json
+{ "date": "2026-09-15", "reason": "Conference" }
+```
+
+Unbooked slots on that date become `BLOCKED`. Booked slots are left alone and
+reported back, so the doctor knows who still needs rescheduling:
+
+```json
+{
+  "success": true,
+  "message": "Time off recorded",
+  "data": { "date": "2026-09-15", "slotsBlocked": 12, "appointmentsToReschedule": 2 }
+}
+```
+
 ### LOCKED SLOT RESPONSE DTO
 
 ```json
@@ -877,6 +936,13 @@ simultaneously.
 | API Documentation & Testing | Anuj | Parth |
 | Docker & Deployment | Parth | Anuj |
 | Future AI Integration | Shared | Shared |
+
+### 23c. Version 1.3 Change Log
+
+Version 1.3 makes availability manageable rather than write-only: listing,
+editing and deleting weekly windows, and blocking a single date for time off.
+A doctor could previously only add windows, and was told about overlaps with no
+way to see or change what caused them.
 
 ### 23b. Version 1.2 Change Log
 

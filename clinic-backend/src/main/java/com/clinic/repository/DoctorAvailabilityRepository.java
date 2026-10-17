@@ -12,4 +12,6 @@ public interface DoctorAvailabilityRepository extends JpaRepository<DoctorAvaila
     List<DoctorAvailability> findByDoctorId(UUID doctorId);
 
     List<DoctorAvailability> findByDoctorIdAndDayOfWeek(UUID doctorId, DayOfWeek dayOfWeek);
+
+    List<DoctorAvailability> findByDoctorIdOrderByDayOfWeekAscStartTimeAsc(UUID doctorId);
 }

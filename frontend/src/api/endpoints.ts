@@ -64,6 +64,29 @@ export const doctors = {
   slots: (doctorId: string, date: string) =>
     request<DoctorSlots>(`/doctors/${doctorId}/slots?date=${date}`),
 
+  /** Every weekly window a doctor has defined (API contract 11, v1.3). */
+  availability: (doctorId: string) => request<Availability[]>(`/doctors/${doctorId}/availability`),
+
+  updateAvailability: (
+    doctorId: string,
+    availabilityId: string,
+    body: { dayOfWeek: string; startTime: string; endTime: string; slotDurationMinutes: number },
+  ) =>
+    request<Availability>(`/doctors/${doctorId}/availability/${availabilityId}`, {
+      method: 'PUT',
+      body,
+    }),
+
+  deleteAvailability: (doctorId: string, availabilityId: string) =>
+    request<void>(`/doctors/${doctorId}/availability/${availabilityId}`, { method: 'DELETE' }),
+
+  /** Blocks a single date without touching the weekly pattern (v1.3). */
+  timeOff: (doctorId: string, date: string, reason?: string) =>
+    request<{ date: string; slotsBlocked: number; appointmentsToReschedule: number }>(
+      `/doctors/${doctorId}/time-off`,
+      { method: 'POST', body: { date, reason } },
+    ),
+
   addAvailability: (
     doctorId: string,
     body: { dayOfWeek: string; startTime: string; endTime: string; slotDurationMinutes: number },
