@@ -7,6 +7,7 @@ import com.clinic.dto.response.AuthUserSummary;
 import com.clinic.dto.response.LoginResponse;
 import com.clinic.dto.response.RegisterResponse;
 import com.clinic.dto.response.TokenRefreshResponse;
+import com.clinic.entity.Role;
 import com.clinic.entity.User;
 import com.clinic.exception.DuplicateEmailException;
 import com.clinic.exception.FieldValidationException;
@@ -36,8 +37,38 @@ public class AuthService {
         this.jwtService = jwtService;
     }
 
+    /**
+     * Public self-registration (API contract 8), which creates a PATIENT and
+     * nothing else.
+     *
+     * <p>Until v1.2 the caller named their own role. The endpoint is public by
+     * necessity, so that let anyone create an administrator for themselves and
+     * then manage every doctor, schedule and appointment in the clinic. Staff
+     * accounts are created by an administrator instead.
+     */
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
+        if (request.role() != null && request.role() != Role.PATIENT) {
+            throw new FieldValidationException("role",
+                    "Only patients can register here. Staff accounts are created by an administrator.");
+        }
+        return createUser(request, Role.PATIENT);
+    }
+
+    /**
+     * Creates a staff account (API contract 8, admin accounts). Callers are
+     * restricted to ADMIN at the controller.
+     */
+    @Transactional
+    public RegisterResponse createStaffAccount(RegisterRequest request) {
+        if (request.role() == null || request.role() == Role.PATIENT) {
+            throw new FieldValidationException("role",
+                    "Use /auth/register for patients. This endpoint creates DOCTOR or ADMIN accounts.");
+        }
+        return createUser(request, request.role());
+    }
+
+    private RegisterResponse createUser(RegisterRequest request, Role role) {
         String email = request.email().trim();
         if (userRepository.existsByEmailIgnoreCase(email)) {
             throw new DuplicateEmailException();
@@ -51,7 +82,7 @@ public class AuthService {
         user.setEmail(email);
         user.setPhone(request.phone());
         user.setPasswordHash(passwordEncoder.encode(request.password()));
-        user.setRole(request.role());
+        user.setRole(role);
 
         try {
             User saved = userRepository.saveAndFlush(user);

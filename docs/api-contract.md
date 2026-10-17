@@ -1,6 +1,6 @@
 # Clinic Management SaaS — Backend Team & API Contract
 
-**Version:** 1.1
+**Version:** 1.2
 **Authors:** Parth + Anuj | Java Spring Boot Backend
 **Status:** Binding. Endpoint shapes, the response envelope, and the canonical `ErrorCode` values
 defined here take precedence over anything improvised during implementation.
@@ -179,6 +179,19 @@ This keeps exception generation and standard HTTP error formatting separate.
 
 ### POST /api/v1/auth/register
 
+Public self-registration. **Creates a `PATIENT` and nothing else.**
+
+`role` remains in the payload for backward compatibility, but `PATIENT` is the
+only accepted value; anything else is rejected with `VALIDATION_ERROR` (422).
+Staff accounts are created by an administrator through
+`POST /api/v1/admin/accounts` below.
+
+> **Changed in v1.2.** Version 1.1 allowed the client to choose its own role,
+> which meant anyone able to reach the endpoint could create an administrator
+> for themselves and then manage every doctor, schedule and appointment in the
+> clinic. The endpoint is public by necessity, so the role had to stop being
+> the caller's choice.
+
 Request:
 
 ```json
@@ -206,6 +219,32 @@ Response 201:
   }
 }
 ```
+
+### POST /api/v1/admin/accounts
+
+Creates a staff account. **`ADMIN` only.** This is how doctors and further
+administrators are onboarded, now that self-registration cannot grant a role.
+
+Request:
+
+```json
+{
+  "name": "Dr. Meera Sharma",
+  "email": "meera@example.com",
+  "phone": "+919876543211",
+  "password": "StrongPassword123",
+  "role": "DOCTOR"
+}
+```
+
+`role` accepts `DOCTOR` or `ADMIN`. A `PATIENT` created here would be
+indistinguishable from one who registered normally, so it is rejected with
+`VALIDATION_ERROR` and pointed at `/auth/register`.
+
+Response 201: the same body as `/auth/register`.
+
+Errors: `UNAUTHORIZED_ACCESS` (403) for a non-admin caller,
+`DUPLICATE_EMAIL` (409), `VALIDATION_ERROR` (422).
 
 ### POST /api/v1/auth/login
 
@@ -815,6 +854,13 @@ simultaneously.
 | API Documentation & Testing | Anuj | Parth |
 | Docker & Deployment | Parth | Anuj |
 | Future AI Integration | Shared | Shared |
+
+### 23b. Version 1.2 Change Log
+
+Version 1.2 closes a privilege escalation in registration.
+`POST /auth/register` now creates a `PATIENT` only; the endpoint is public, so
+allowing the caller to name their own role let anyone create an administrator.
+Staff accounts move to a new admin-only `POST /api/v1/admin/accounts`.
 
 ### 23a. Version 1.1 Change Log
 
