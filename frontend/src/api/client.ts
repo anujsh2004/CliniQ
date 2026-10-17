@@ -94,6 +94,62 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   return (payload as ApiSuccess<T>).data;
 }
 
+/**
+ * The same envelope, but for a file upload.
+ *
+ * <p>Separate from {@link request} because a multipart body must not be
+ * JSON-encoded, and because the browser has to set its own Content-Type: the
+ * multipart boundary is generated per request, so setting the header by hand
+ * produces a body the server cannot parse.
+ */
+export async function requestForm<T>(path: string, form: FormData): Promise<T> {
+  const headers: Record<string, string> = {};
+  const token = readToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: form });
+  const payload = await readBody(response);
+
+  if (!response.ok) {
+    const error = new ApiRequestError(response.status, payload as Partial<ApiError>);
+    if (response.status === 401) {
+      onUnauthorized();
+    }
+    throw error;
+  }
+
+  return (payload as ApiSuccess<T>).data;
+}
+
+/**
+ * A POST that returns binary rather than the standard envelope.
+ *
+ * <p>Only synthesised speech uses this. The envelope is JSON by contract, so
+ * an endpoint returning a wav cannot use it; the error path still reads the
+ * envelope, because a failure does come back as JSON.
+ */
+export async function requestAudio(path: string, form: FormData): Promise<Blob> {
+  const headers: Record<string, string> = {};
+  const token = readToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: form });
+
+  if (!response.ok) {
+    const payload = await readBody(response);
+    if (response.status === 401) {
+      onUnauthorized();
+    }
+    throw new ApiRequestError(response.status, payload as Partial<ApiError>);
+  }
+
+  return response.blob();
+}
+
 async function readBody(response: Response): Promise<unknown> {
   const text = await response.text();
   if (!text) {

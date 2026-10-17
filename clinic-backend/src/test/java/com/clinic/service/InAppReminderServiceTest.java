@@ -28,6 +28,8 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -173,8 +175,17 @@ class InAppReminderServiceTest {
     void aReminderWhoseMomentHasAlreadyPassedIsNotScheduled() {
         // Booked an hour before the appointment: the 24-hour reminder has no
         // useful moment left, so scheduling it would only produce noise.
-        appointment.getSlot().setDate(LocalDate.now());
-        appointment.getSlot().setStartTime(LocalTime.now().plusMinutes(90));
+        //
+        // The moment is built as a whole instant rather than as a date plus
+        // LocalTime.now().plusMinutes(90). A bare LocalTime wraps at midnight,
+        // so after 22:30 that produced a time early the same morning — an
+        // appointment nearly a day in the past, for which both reminders are
+        // correctly skipped and the test failed. Deriving both fields from one
+        // ZonedDateTime carries the date over midnight, and pins the clinic's
+        // zone rather than inheriting whatever the runner uses.
+        ZonedDateTime soon = ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).plusMinutes(90);
+        appointment.getSlot().setDate(soon.toLocalDate());
+        appointment.getSlot().setStartTime(soon.toLocalTime());
 
         service.scheduleClinicReminders(appointment);
 

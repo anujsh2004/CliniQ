@@ -35,6 +35,25 @@ changes, update the contract first, then implement it.**
   `tech-stack.md` §5 names Twilio as one option without committing) and sandbox
   credentials.
 
+### D28 — The speech voices are licensed for non-commercial use only
+
+- **Where:** `feature/ai-integration`; API contract 25
+- **Shipped:** Meta's MMS-TTS (`facebook/mms-tts-hin`, `-tam`, `-eng`) reads
+  every spoken reply. It is **CC-BY-NC 4.0** — free to download and run, but
+  the licence forbids use in anything sold.
+- **Why it shipped anyway:** the two commercially licensed alternatives both
+  failed on this machine. AI4Bharat IndicF5 (MIT) will not load at all — its
+  model code predates PyTorch 2.14's meta-device initialisation and fails on
+  every transformers version tried. AI4Bharat Indic Parler-TTS (Apache 2.0)
+  generates audio autoregressively and needs a GPU; on CPU it did not finish
+  loading in twenty minutes. MMS produces a whole waveform in one pass, so it
+  runs on a CPU in about a second.
+- **What is fine:** the recognisers. IndicConformer and Whisper are both MIT,
+  so only the *speaking* half carries the restriction.
+- **Needs:** either a GPU, which would likely make Parler-TTS viable and remove
+  the problem outright, or a different commercially licensed voice model. This
+  must be resolved before CliniQ is sold, not before it is demonstrated.
+
 ### D2 — Data retention, PII and backup policy
 
 - **Where:** `product-description.md` §22 item 7
