@@ -148,6 +148,9 @@ public class InAppReminderService {
         UUID userId = CurrentUser.require().userId();
         List<Notification> unread = notificationRepository.findDeliveredForUser(userId).stream()
                 .filter(notification -> notification.getReadAt() == null)
+                // A reminder that has not been delivered yet cannot have been
+                // read, and marking it read would hide it when it arrives.
+                .filter(notification -> notification.getStatus() != NotificationStatus.QUEUED)
                 .toList();
         unread.forEach(notification -> notification.setReadAt(OffsetDateTime.now()));
         notificationRepository.saveAll(unread);

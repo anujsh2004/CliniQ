@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { AssistantWidget } from './AssistantWidget';
+import { NotificationBell } from './NotificationBell';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from './Button';
 import type { Role } from '@/types/api';
@@ -74,9 +75,13 @@ export function AppShell() {
             </p>
             {user && <p className="text-meta text-text-secondary">{titleCase(user.role)}</p>}
           </div>
-          <Button variant="ghost" onClick={handleSignOut}>
-            Sign out
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Only patients receive reminders, so only they get the bell. */}
+            {hasRole('PATIENT') && <NotificationBell />}
+            <Button variant="ghost" onClick={handleSignOut}>
+              Sign out
+            </Button>
+          </div>
         </header>
 
         {/* design.md 2.3: constrained width so tables do not stretch on wide

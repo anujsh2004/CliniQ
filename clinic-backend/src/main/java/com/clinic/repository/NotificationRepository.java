@@ -23,14 +23,16 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
             NotificationStatus status, java.time.OffsetDateTime before);
 
     /**
-     * What a patient sees: their own reminders that are actually due, newest
-     * first. A reminder scheduled for tomorrow is not shown today.
+     * Every reminder belonging to a patient, delivered or still scheduled.
+     *
+     * <p>Scheduled ones are included deliberately: a patient who has just
+     * booked has reminders coming but none delivered, and an empty page would
+     * suggest the clinic had forgotten them. The client groups the two.
      */
     @EntityGraph(attributePaths = {"appointment", "appointment.doctor", "appointment.slot"})
     @Query("""
             SELECT n FROM Notification n
              WHERE n.appointment.patient.user.id = :userId
-               AND n.status <> com.clinic.entity.NotificationStatus.QUEUED
              ORDER BY n.scheduledFor DESC
             """)
     List<Notification> findDeliveredForUser(@Param("userId") UUID userId);
