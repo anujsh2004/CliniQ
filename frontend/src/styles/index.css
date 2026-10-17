@@ -61,3 +61,32 @@ body {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
+
+/**
+ * The public page keeps its own palette rather than following the app's theme.
+ * It is a single deliberate look - dark, high contrast, the same one the build
+ * handbook uses - and it holds whichever theme the signed-in app is set to.
+ */
+.landing {
+  --paper: #0e1117;
+  --surface: #161a22;
+  --surface-sunk: #1c212b;
+  --rule: #2a313d;
+  --rule-soft: #222834;
+  --ink: #eef1f6;
+  --ink-soft: #b3bac7;
+  --ink-faint: #8a93a2;
+  --brand: #7ca0f5;
+  --brand-soft: #1b2440;
+  --good: #5fcfa1;
+
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: '"IBM Plex Sans"', 'IBM Plex Sans', Inter, system-ui, sans-serif;
+  min-height: 100%;
+}
+
+.landing ::selection {
+  background: var(--brand-soft);
+  color: var(--ink);
+}

@@ -47,6 +47,15 @@ test.describe('Accessibility', () => {
     doctor = await seedDoctorWithSlots(request);
   });
 
+  test('the public landing page has no violations', async ({ clientPage: page }) => {
+    // The first thing anyone sees, and the only page a visitor meets before
+    // they have an account.
+    await page.goto('/');
+    const { violations } = await audit(page);
+    expect(violations, `
+${describe(violations)}`).toEqual([]);
+  });
+
   test('the sign-in screen has no violations', async ({ clientPage: page }) => {
     await page.goto('/login');
     const { violations } = await audit(page);
