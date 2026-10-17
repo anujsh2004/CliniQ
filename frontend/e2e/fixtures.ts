@@ -193,7 +193,7 @@ export async function bookSlotViaApi(
   request: APIRequestContext,
   doctor: SeededDoctor,
   startTime: string,
-): Promise<void> {
+): Promise<string> {
   const clientIp = nextClientIp();
   const patient = await seedPatient(request, 'API Booker');
   const patientToken = await token(request, patient.email, clientIp);
@@ -214,6 +214,7 @@ export async function bookSlotViaApi(
     data: { doctorId: doctor.doctorId, slotId: slot.slotId, reason: 'Taken by another patient' },
   });
   expect(booked.status(), await booked.text()).toBe(201);
+  return (await booked.json()).data.appointmentId as string;
 }
 
 /**

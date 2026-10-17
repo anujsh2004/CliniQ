@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { AssistantWidget } from './AssistantWidget';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from './Button';
 import type { Role } from '@/types/api';
@@ -84,6 +85,7 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
+      <AssistantWidget />
     </div>
   );
 }
