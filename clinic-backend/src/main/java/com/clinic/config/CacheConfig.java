@@ -19,8 +19,15 @@ import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Read-through caching for the read-heavy, less volatile endpoints
- * (tech-stack.md 3, Caching).
+ * Cache wiring, currently with nothing cached.
+ *
+ * <p>The doctor list and profile were cached here until the load test showed
+ * the cache losing to the database it was meant to spare: a p95 of 624ms
+ * against 334ms for the uncached slot fetch, because the list is a trivial
+ * query over a handful of rows and a Redis round trip costs more than the query
+ * it replaces. The caches, their serializers and the failure handling stay
+ * configured so that restoring them is one annotation once the roster is large
+ * enough to justify it (decision D25).
  *
  * <p>Two rules govern what may be cached here:
  *
