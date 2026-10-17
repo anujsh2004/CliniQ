@@ -32,6 +32,10 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
 
     boolean existsBySlotIdAndStatusIn(UUID slotId, List<com.clinic.entity.AppointmentStatus> statuses);
 
+    /** Live appointments whose hold on a slot has run out (v1.4). */
+    List<Appointment> findByStatusAndHoldExpiresAtBefore(
+            com.clinic.entity.AppointmentStatus status, java.time.OffsetDateTime before);
+
     /** Appointments still live on a given date, for the reminder sweep. */
     @EntityGraph(attributePaths = {"doctor", "patient", "patient.user", "slot"})
     @Query("""

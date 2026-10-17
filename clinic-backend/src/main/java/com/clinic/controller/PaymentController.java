@@ -46,6 +46,20 @@ public class PaymentController {
     }
 
     /**
+     * Confirms an appointment without a gateway (v1.4).
+     *
+     * <p>Stands in for the checkout while Razorpay is deferred, and is refused
+     * outright once real credentials exist.
+     */
+    @PostMapping("/demo-confirm")
+    @PreAuthorize("hasAnyRole('PATIENT', 'ADMIN')")
+    public ResponseEntity<ApiResponse<PaymentWebhookResult>> confirmDemo(
+            @Valid @RequestBody CreatePaymentOrderRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Payment confirmed",
+                paymentService.confirmWithoutGateway(request.appointmentId())));
+    }
+
+    /**
      * Called by the gateway, not by our client.
      *
      * <p>The body is taken as a raw string on purpose: the signature covers the

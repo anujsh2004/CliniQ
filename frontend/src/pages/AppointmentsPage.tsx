@@ -6,6 +6,7 @@ import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { PageHeader } from '@/components/PageHeader';
+import { HoldCountdown } from '@/components/HoldCountdown';
 import { PaymentAction } from '@/components/PaymentAction';
 import { StatusBadge } from '@/components/StatusBadge';
 import { EmptyState, ErrorState, SkeletonRows } from '@/components/States';
@@ -145,6 +146,14 @@ export function AppointmentsPage() {
                   <StatusBadge status={appointment.status} />
                   {paymentBadgeIsInformative(appointment) && (
                     <StatusBadge status={appointment.paymentStatus} />
+                  )}
+                  {awaitsPayment(appointment) && appointment.holdExpiresAt && (
+                    <HoldCountdown
+                      expiresAt={appointment.holdExpiresAt}
+                      onExpired={() =>
+                        void queryClient.invalidateQueries({ queryKey: ['appointments'] })
+                      }
+                    />
                   )}
                   {awaitsPayment(appointment) && (
                     <PaymentAction

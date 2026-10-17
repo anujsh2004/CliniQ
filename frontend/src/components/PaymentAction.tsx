@@ -35,16 +35,17 @@ export function PaymentAction({
   const handlePay = async () => {
     setBusy(true);
     try {
-      const order = await payments.createOrder(appointment.appointmentId);
-
       if (!isCheckoutConfigured()) {
-        // No publishable key in this environment. Say so plainly rather than
-        // opening a checkout that cannot work; the order is real and the
-        // appointment can still be paid once a key is configured.
-        toast.error('Online payment is not set up yet. Please pay at the clinic.');
+        // Razorpay is deferred, so the demo confirmation stands in for the
+        // checkout. The server refuses it the moment real credentials exist,
+        // so this can never confirm an unpaid appointment for real money.
+        await payments.demoConfirm(appointment.appointmentId);
+        toast.success('Payment confirmed. Your appointment is booked.');
         void refreshAppointments();
         return;
       }
+
+      const order = await payments.createOrder(appointment.appointmentId);
 
       await openCheckout(order, patientName, {
         onCompleted: () => {
@@ -74,7 +75,7 @@ export function PaymentAction({
 
   return (
     <Button loading={busy} onClick={handlePay}>
-      {busy ? 'Starting…' : 'Pay now'}
+      {busy ? 'Confirming…' : 'Pay now'}
     </Button>
   );
 }

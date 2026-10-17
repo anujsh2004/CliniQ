@@ -54,7 +54,8 @@ public class AppointmentMapper {
                 slot.getDate(),
                 slot.getStartTime(),
                 appointment.getStatus(),
-                appointment.getPaymentStatus());
+                appointment.getPaymentStatus(),
+                appointment.getHoldExpiresAt());
     }
 
     /** The doctor's own daily list carries the patient's phone (contract 13). */

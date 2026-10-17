@@ -81,7 +81,7 @@ class AppointmentControllerTest {
         when(appointmentQueryService.listOwn(any())).thenReturn(new PagedResponse<>(
                 List.of(new AppointmentListItem(UUID.randomUUID().toString(), "Dr. Sharma",
                         LocalDate.of(2026, 8, 20), LocalTime.of(10, 0),
-                        AppointmentStatus.CONFIRMED, PaymentStatus.PAID)),
+                        AppointmentStatus.CONFIRMED, PaymentStatus.PAID, null)),
                 0, 10, 1, 1));
 
         mockMvc.perform(get("/api/v1/appointments/my"))
