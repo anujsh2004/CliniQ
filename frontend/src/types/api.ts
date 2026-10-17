@@ -189,3 +189,16 @@ export interface Availability {
   endTime: string;
   slotDurationMinutes: number;
 }
+
+/** One row of the patient's reminder list (API contract 15, v1.4). */
+export interface NotificationSummary {
+  notificationId: string;
+  appointmentId: string;
+  message: string;
+  reminderType: string;
+  scheduledFor: string;
+  status: 'QUEUED' | 'SENT' | 'DELIVERED' | 'FAILED';
+  read: boolean;
+  /** Reminders the patient added themselves, and may remove. */
+  patientRequested: boolean;
+}

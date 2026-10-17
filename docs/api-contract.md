@@ -772,7 +772,38 @@ Successful internal result:
 }
 ```
 
-## 15. Future Notification Contract
+## 15. Notification Contract
+
+> **Changed in v1.4.** Reminders are shown in the patient's own list rather than
+> sent over WhatsApp, for which no provider is configured (decision D19). The
+> clinic's reminder rules - when each fires and what it says - are configuration
+> under `clinic.notifications.reminders`, so changing them needs no code change.
+> A patient may add their own reminders on top of the clinic's.
+
+### GET /api/v1/notifications
+
+The caller's own reminders that are due, newest first. `PATIENT` only.
+
+### GET /api/v1/notifications/unread-count
+
+`{ "unread": 3 }` — drives the unread badge.
+
+### POST /api/v1/notifications/reminders
+
+`{ "appointmentId": "uuid", "minutesBefore": 180 }` — a reminder the patient
+chooses, in addition to the clinic's. Refused if it would fall closer to the
+appointment than `clinic.notifications.minimum-patient-offset`, or in the past.
+
+### DELETE /api/v1/notifications/reminders/{notificationId}
+
+Removes a reminder the patient added. The clinic's own reminders are not theirs
+to delete and are refused with `VALIDATION_ERROR`.
+
+### PATCH /api/v1/notifications/{notificationId}/read · PATCH /api/v1/notifications/read-all
+
+Marks reminders read.
+
+### Legacy queue contract
 
 ### POST /api/v1/internal/notifications/reminders
 

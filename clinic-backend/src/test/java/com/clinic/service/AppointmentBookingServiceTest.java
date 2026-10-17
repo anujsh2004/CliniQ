@@ -56,7 +56,8 @@ class AppointmentBookingServiceTest {
 
     private final AppointmentBookingService service = new AppointmentBookingService(
             appointmentRepository, slotRepository, doctorRepository, patientService, new AppointmentMapper(),
-            new com.clinic.config.HoldProperties(java.time.Duration.ofMinutes(5), null));
+            new com.clinic.config.HoldProperties(java.time.Duration.ofMinutes(5), null),
+            mock(InAppReminderService.class));
 
     @AfterEach
     void clearSecurityContext() {

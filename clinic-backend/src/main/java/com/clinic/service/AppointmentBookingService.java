@@ -29,6 +29,8 @@ import com.clinic.repository.SlotRepository;
 import com.clinic.security.AuthenticatedUser;
 import com.clinic.security.CurrentUser;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,6 +65,8 @@ import java.util.UUID;
 @Service
 public class AppointmentBookingService {
 
+    private static final Logger log = LoggerFactory.getLogger(AppointmentBookingService.class);
+
     private static final List<AppointmentStatus> LIVE_STATUSES =
             List.of(AppointmentStatus.PENDING_PAYMENT, AppointmentStatus.CONFIRMED);
 
@@ -73,19 +77,22 @@ public class AppointmentBookingService {
     private final AppointmentMapper appointmentMapper;
 
     private final HoldProperties holdProperties;
+    private final InAppReminderService reminderService;
 
     public AppointmentBookingService(AppointmentRepository appointmentRepository,
                                      SlotRepository slotRepository,
                                      DoctorRepository doctorRepository,
                                      PatientService patientService,
                                      AppointmentMapper appointmentMapper,
-                                     HoldProperties holdProperties) {
+                                     HoldProperties holdProperties,
+                                     InAppReminderService reminderService) {
         this.appointmentRepository = appointmentRepository;
         this.slotRepository = slotRepository;
         this.doctorRepository = doctorRepository;
         this.patientService = patientService;
         this.appointmentMapper = appointmentMapper;
         this.holdProperties = holdProperties;
+        this.reminderService = reminderService;
     }
 
     /**
@@ -118,7 +125,16 @@ public class AppointmentBookingService {
         appointment.setHoldExpiresAt(OffsetDateTime.now().plus(holdProperties.duration()));
 
         try {
-            return appointmentMapper.toCreated(appointmentRepository.saveAndFlush(appointment));
+            Appointment saved = appointmentRepository.saveAndFlush(appointment);
+            // Reminders are scheduled now, while the appointment's time is
+            // known. A failure here must not lose the booking, which is the
+            // thing the patient actually came for.
+            try {
+                reminderService.scheduleClinicReminders(saved);
+            } catch (RuntimeException ex) {
+                log.warn("Could not schedule reminders for appointment {}", saved.getId(), ex);
+            }
+            return appointmentMapper.toCreated(saved);
         } catch (DataIntegrityViolationException ex) {
             // The partial unique index refused a second live appointment for
             // this slot. Report it as the race it is, not as a server error.
