@@ -152,7 +152,7 @@ class DoctorServiceCachingTest {
                 new AuthenticatedUser(UUID.randomUUID(), "admin@example.com", Role.ADMIN), null, List.of()));
 
         doctorService.create(new CreateDoctorRequest("Dr. New", "General", "LIC-NEW",
-                new BigDecimal("300.00"),
+                new BigDecimal("300.00"), null,
                 new ClinicRequest("Sharma Dental Clinic", "MG Road, Chennai", "+919876543210")));
 
         assertThat(cacheManager.getCache(CacheConfig.DOCTOR_LIST).get("0-10")).isNull();

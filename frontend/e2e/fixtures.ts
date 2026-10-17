@@ -54,18 +54,44 @@ export interface SeededDoctor {
   date: string;
 }
 
+/**
+ * The administrator these tests onboard staff through.
+ *
+ * <p>Since contract v1.2 a doctor account cannot be self-registered, so the
+ * tests do what the clinic does: an administrator creates the account. The
+ * bootstrap administrator is the one the application creates on an empty
+ * database, so this works against a fresh environment as well as a seeded one.
+ */
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? 'ramesh@example.com';
+
 async function register(
   request: APIRequestContext,
-  role: 'PATIENT' | 'DOCTOR' | 'ADMIN',
   name: string,
   clientIp: string,
 ): Promise<{ email: string; name: string }> {
-  const email = `${unique(role.toLowerCase())}@example.com`;
+  const email = `${unique('patient')}@example.com`;
   // Phone must be unique too: the contract enforces it.
   const phone = `+9198${Math.floor(10000000 + Math.random() * 89999999)}`;
   const response = await request.post(`${API}/auth/register`, {
     headers: asClient(clientIp),
-    data: { name, email, phone, password: PASSWORD, role },
+    data: { name, email, phone, password: PASSWORD, role: 'PATIENT' },
+  });
+  expect(response.status(), await response.text()).toBe(201);
+  return { email, name };
+}
+
+/** Creates a DOCTOR account the way an administrator does (contract v1.2). */
+async function registerDoctorAccount(
+  request: APIRequestContext,
+  name: string,
+  clientIp: string,
+): Promise<{ email: string; name: string }> {
+  const adminToken = await token(request, ADMIN_EMAIL, nextClientIp());
+  const email = `${unique('doctor')}@example.com`;
+  const phone = `+9198${Math.floor(10000000 + Math.random() * 89999999)}`;
+  const response = await request.post(`${API}/admin/accounts`, {
+    headers: { Authorization: `Bearer ${adminToken}`, ...asClient(clientIp) },
+    data: { name, email, phone, password: PASSWORD, role: 'DOCTOR' },
   });
   expect(response.status(), await response.text()).toBe(201);
   return { email, name };
@@ -109,7 +135,7 @@ const DAY_NAMES = [
 export async function seedDoctorWithSlots(request: APIRequestContext): Promise<SeededDoctor> {
   const doctorName = `Dr. E2E ${unique('')}`;
   const clientIp = nextClientIp();
-  const account = await register(request, 'DOCTOR', doctorName, clientIp);
+  const account = await registerDoctorAccount(request, doctorName, clientIp);
   const doctorToken = await token(request, account.email, clientIp);
   const auth = { Authorization: `Bearer ${doctorToken}`, ...asClient(clientIp) };
 
@@ -148,7 +174,7 @@ export async function seedDoctorWithSlots(request: APIRequestContext): Promise<S
 }
 
 export async function seedPatient(request: APIRequestContext, name: string): Promise<TestPatient> {
-  return register(request, 'PATIENT', name, nextClientIp());
+  return register(request, name, nextClientIp());
 }
 
 /** Signs in through the real login form, as a patient would. */
