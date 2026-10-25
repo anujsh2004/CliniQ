@@ -139,6 +139,16 @@ public class GlobalExceptionHandler {
         return transportError(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
     }
 
+    /**
+     * The ML service is switched on but not answering. 503 for the same reason
+     * as speech: the request was fine, and the feature is optional.
+     */
+    @ExceptionHandler(com.clinic.ml.MlUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleMlUnavailable(com.clinic.ml.MlUnavailableException ex) {
+        log.warn("ML service unavailable: {}", ex.getMessage());
+        return transportError(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception ex) {
         // Never leak internals (API contract 6): log the detail, return a generic message.

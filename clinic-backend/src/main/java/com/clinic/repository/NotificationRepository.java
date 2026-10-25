@@ -37,6 +37,18 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
             """)
     List<Notification> findDeliveredForUser(@Param("userId") UUID userId);
 
+    /**
+     * Which of these appointments have a reminder sent or still to come, for
+     * no-show risk (v1.6). A failed reminder reached nobody, so it does not
+     * count.
+     */
+    @Query("""
+            SELECT DISTINCT n.appointment.id FROM Notification n
+             WHERE n.appointment.id IN :appointmentIds
+               AND n.status <> com.clinic.entity.NotificationStatus.FAILED
+            """)
+    List<UUID> findAppointmentIdsWithReminders(@Param("appointmentIds") java.util.Collection<UUID> appointmentIds);
+
     long countByAppointmentPatientUserIdAndReadAtIsNullAndStatusNot(
             UUID userId, NotificationStatus excluded);
 }

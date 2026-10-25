@@ -1,6 +1,8 @@
 package com.clinic.entity;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -16,6 +18,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.OffsetDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -65,4 +69,13 @@ public class Appointment extends BaseEntity {
      */
     @Column(name = "hold_expires_at")
     private OffsetDateTime holdExpiresAt;
+
+    /**
+     * Symptoms the patient ticked when booking, as ML vocabulary codes (API
+     * contract 27, v1.6). Optional; shown to the treating doctor only.
+     */
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "appointment_symptoms", joinColumns = @JoinColumn(name = "appointment_id"))
+    @Column(name = "symptom", nullable = false, length = 60)
+    private Set<String> symptoms = new LinkedHashSet<>();
 }

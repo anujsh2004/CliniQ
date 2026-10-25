@@ -150,12 +150,34 @@ export interface AppointmentDetail {
   paymentStatus: PaymentStatus;
 }
 
+/** Added in v1.6 (API contract 26). Absent when the ML service is off. */
+export interface NoShowRisk {
+  probability: number;
+  band: 'LOW' | 'MEDIUM' | 'HIGH';
+  modelVersion: string;
+}
+
+/** A symptom a patient may report when booking (API contract 27). */
+export interface Symptom {
+  code: string;
+  label: string;
+}
+
+/** Added in v1.6 (API contract 27). For the treating doctor only. */
+export interface ConditionHints {
+  modelVersion: string;
+  conditions: { name: string; probability: number }[];
+}
+
 export interface DoctorDayAppointment {
   appointmentId: string;
   patient: { patientId: string; name: string; phone?: string };
   startTime: string;
   endTime: string;
   status: AppointmentStatus;
+  noShowRisk?: NoShowRisk;
+  symptoms?: string[];
+  conditionHints?: ConditionHints;
 }
 
 export interface DoctorDayAppointments {

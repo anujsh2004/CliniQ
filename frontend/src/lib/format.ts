@@ -41,3 +41,9 @@ export function upcomingDates(count: number): string[] {
     return toApiDate(date);
   });
 }
+
+/** A symptom code as a person reads it: "skin_rash" is "Skin rash". */
+export function symptomLabel(code: string): string {
+  const words = code.replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}

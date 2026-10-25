@@ -54,6 +54,48 @@ changes, update the contract first, then implement it.**
   the problem outright, or a different commercially licensed voice model. This
   must be resolved before CliniQ is sold, not before it is demonstrated.
 
+### D29 — The no-show model is trained on someone else's patients
+
+- **Where:** `feature/no-show-risk`; API contract 26; `ml-service/`
+- **Shipped:** a model trained on the Kaggle *Medical Appointment No Shows*
+  dataset - public appointments from Vitória, Brazil, in 2016 - scoring CliniQ
+  appointments in Bengaluru. Off by default (`clinic.ml.enabled`).
+- **What this means:** the ranking (who is riskier than whom) is likely to
+  carry over, because lead time and past no-shows predict missed visits almost
+  everywhere. The probabilities are less likely to: a different base rate makes
+  "37%" wrong even when the order is right. Bands are shares of appointments
+  rather than probability cut-offs for exactly this reason.
+- **Licence:** the dataset is **CC BY-NC-SA**. Like D28, fine to demonstrate,
+  not to sell. The CSV is never committed.
+- **Not modelled:** abandoned holds. Kaggle has no equivalent of a payment
+  hold, so there is nothing to learn it from; it needs CliniQ's own data.
+- **Needs:** a retraining job on CliniQ's own `COMPLETED` / `NO_SHOW` outcomes
+  once there are enough of them (a few thousand), which also removes the
+  licence problem. `PATCH /appointments/{id}/no-show` exists so those outcomes
+  are recorded at all.
+
+### D30 — Condition hints come from a synthetic dataset
+
+- **Where:** `feature/no-show-risk`; API contract 27; `ml-service/conditions.py`
+- **Shipped:** symptom-to-condition hints on the doctor's schedule, from a
+  model trained on the Kaggle *Disease Prediction Using Machine Learning*
+  dataset. Off by default (`clinic.ml.enabled`). Doctor only.
+- **What this means:** the dataset is generated, not collected. Each of its 41
+  conditions has a near-fixed symptom set, and its 4,920 rows are 305 distinct
+  cases repeated, which is why it is known for 100% accuracy. Real patients
+  report vague, overlapping symptoms, and the probabilities here know nothing
+  about how common each condition is in a Bengaluru clinic. The measured
+  numbers (89% top three with two symptoms) are an upper bound, not a forecast.
+- **Why doctor-only:** a ranked list of diseases shown to a patient reads as a
+  diagnosis, which CliniQ refuses to give anywhere else. The patient sees a
+  fixed emergency notice instead, independent of the model.
+- **Not a medical device.** Before any real clinical use this needs a dataset
+  from real consultations, clinical review of the condition list, and a
+  regulatory view; in India, software that suggests a diagnosis can fall under
+  the Medical Devices Rules.
+- **Needs:** a real dataset, or the doctor's final diagnosis recorded per visit
+  so CliniQ can learn from its own cases.
+
 ### D2 — Data retention, PII and backup policy
 
 - **Where:** `product-description.md` §22 item 7

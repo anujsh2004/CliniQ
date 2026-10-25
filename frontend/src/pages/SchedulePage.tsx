@@ -4,19 +4,37 @@ import { ApiRequestError } from '@/api/client';
 import { appointments, doctors } from '@/api/endpoints';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
+import { ConditionHintsPanel } from '@/components/ConditionHintsPanel';
 import { DateStrip } from '@/components/DateStrip';
 import { PageHeader } from '@/components/PageHeader';
+import { RiskBadge } from '@/components/RiskBadge';
 import { StatusBadge } from '@/components/StatusBadge';
 import { EmptyState, ErrorState, SkeletonRows } from '@/components/States';
 import { useToast } from '@/components/Toast';
-import { formatTime, upcomingDates } from '@/lib/format';
-import type { AppointmentStatus } from '@/types/api';
+import { formatTime, toApiDate, upcomingDates } from '@/lib/format';
+import type { AppointmentStatus, DoctorDayAppointment } from '@/types/api';
 
 const DATE_WINDOW_DAYS = 14;
 
 /** Only a live appointment can be closed out. */
 function canComplete(status: AppointmentStatus): boolean {
   return status === 'PENDING_PAYMENT' || status === 'CONFIRMED';
+}
+
+/**
+ * A no-show is a confirmed visit whose time has come. The server enforces the
+ * same rule; this only keeps the button off rows where it would be refused.
+ */
+function canMarkNoShow(appointment: DoctorDayAppointment, date: string, now: Date): boolean {
+  if (appointment.status !== 'CONFIRMED') {
+    return false;
+  }
+  const today = toApiDate(now);
+  if (date !== today) {
+    return date < today;
+  }
+  const [hours, minutes] = appointment.startTime.split(':').map(Number);
+  return hours * 60 + minutes <= now.getHours() * 60 + now.getMinutes();
 }
 
 export function SchedulePage() {
@@ -45,7 +63,19 @@ export function SchedulePage() {
     },
   });
 
+  const noShow = useMutation({
+    mutationFn: (appointmentId: string) => appointments.markNoShow(appointmentId),
+    onSuccess: () => {
+      toast.success('Marked as a no-show.');
+      void queryClient.invalidateQueries({ queryKey: ['schedule'] });
+    },
+    onError: (error) => {
+      toast.error(error instanceof ApiRequestError ? error.message : 'Could not reach the server.');
+    },
+  });
+
   const dayAppointments = query.data?.appointments ?? [];
+  const now = new Date();
 
   return (
     <>
@@ -106,7 +136,8 @@ export function SchedulePage() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <RiskBadge risk={appointment.noShowRisk} />
                   <StatusBadge status={appointment.status} />
                   {canComplete(appointment.status) && (
                     <Button
@@ -117,7 +148,20 @@ export function SchedulePage() {
                       Mark complete
                     </Button>
                   )}
+                  {canMarkNoShow(appointment, date, now) && (
+                    <Button
+                      variant="secondary"
+                      loading={noShow.isPending && noShow.variables === appointment.appointmentId}
+                      onClick={() => noShow.mutate(appointment.appointmentId)}
+                    >
+                      No-show
+                    </Button>
+                  )}
                 </div>
+                <ConditionHintsPanel
+                  symptoms={appointment.symptoms}
+                  hints={appointment.conditionHints}
+                />
               </Card>
             ))}
           </div>

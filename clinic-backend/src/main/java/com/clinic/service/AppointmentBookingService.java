@@ -122,6 +122,9 @@ public class AppointmentBookingService {
         appointment.setStatus(AppointmentStatus.PENDING_PAYMENT);
         appointment.setPaymentStatus(PaymentStatus.PENDING);
         appointment.setReason(request.reason());
+        if (request.symptoms() != null) {
+            appointment.getSymptoms().addAll(request.symptoms());
+        }
         appointment.setHoldExpiresAt(OffsetDateTime.now().plus(holdProperties.duration()));
 
         try {

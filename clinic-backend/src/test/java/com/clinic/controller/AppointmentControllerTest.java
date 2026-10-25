@@ -16,6 +16,7 @@ import com.clinic.testsupport.SecuritySliceTestConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.http.MediaType;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -30,6 +31,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -119,6 +121,42 @@ class AppointmentControllerTest {
         mockMvc.perform(patch("/api/v1/appointments/" + UUID.randomUUID() + "/complete"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED_ACCESS"));
+    }
+
+    @Test
+    @WithMockUser(roles = "DOCTOR")
+    void markingANoShowReturnsTheNewStatus() throws Exception {
+        UUID appointmentId = UUID.randomUUID();
+        when(appointmentQueryService.markNoShow(appointmentId)).thenReturn(
+                AppointmentStatusResponse.of(appointmentId.toString(), AppointmentStatus.NO_SHOW));
+
+        mockMvc.perform(patch("/api/v1/appointments/" + appointmentId + "/no-show"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Appointment marked as a no-show"))
+                .andExpect(jsonPath("$.data.status").value("NO_SHOW"))
+                .andExpect(jsonPath("$.data.followUpEligible").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(roles = "PATIENT")
+    void aPatientCannotMarkTheirOwnNoShow() throws Exception {
+        mockMvc.perform(patch("/api/v1/appointments/" + UUID.randomUUID() + "/no-show"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED_ACCESS"));
+    }
+
+    @Test
+    @WithMockUser(roles = "PATIENT")
+    void aMalformedSymptomCodeIsRejectedBeforeBooking() throws Exception {
+        // v1.6: codes, not free text. Free text would bypass the model's
+        // vocabulary and invite a patient to type a medical history here.
+        mockMvc.perform(post("/api/v1/appointments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"doctorId": "%s", "slotId": "%s", "symptoms": ["High Fever!"]}
+                                """.formatted(UUID.randomUUID(), UUID.randomUUID())))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
     }
 
     @Test

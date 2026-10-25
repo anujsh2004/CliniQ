@@ -21,6 +21,8 @@ If a requirement changes, update the API contract first, then implement it.
 
 ```
 clinic-backend/    Java 21 + Spring Boot + PostgreSQL backend (see tech-stack.md §2)
+asr-service/       Self-hosted speech in and out (FastAPI), behind clinic.speech.enabled
+ml-service/        Self-hosted no-show risk and condition-hint models (FastAPI), behind clinic.ml.enabled
 docs/              Binding API contract and supporting engineering docs
 ```
 

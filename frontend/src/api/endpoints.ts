@@ -16,6 +16,7 @@ import type {
   PatientProfile,
   RegisterResult,
   Role,
+  Symptom,
 } from '@/types/api';
 
 /** One function per endpoint in the API contract, named after what it does. */
@@ -134,7 +135,7 @@ export const payments = {
 };
 
 export const appointments = {
-  book: (body: { doctorId: string; slotId: string; reason?: string }) =>
+  book: (body: { doctorId: string; slotId: string; reason?: string; symptoms?: string[] }) =>
     request<AppointmentCreated>('/appointments', { method: 'POST', body }),
 
   mine: (page = 0, size = 10) =>
@@ -159,6 +160,11 @@ export const appointments = {
       `/appointments/${appointmentId}/complete`,
       { method: 'PATCH' },
     ),
+
+  markNoShow: (appointmentId: string) =>
+    request<{ appointmentId: string; status: string }>(`/appointments/${appointmentId}/no-show`, {
+      method: 'PATCH',
+    }),
 };
 
 export const notifications = {
@@ -220,4 +226,12 @@ export const voice = {
     form.append('language', language);
     return requestAudio('/voice/speak', form);
   },
+};
+
+/**
+ * The symptom vocabulary (API contract 27). Absent - a 404 - when the ML
+ * service is switched off, and the booking page then simply has no picker.
+ */
+export const symptoms = {
+  list: () => request<{ symptoms: Symptom[] }>('/symptoms'),
 };

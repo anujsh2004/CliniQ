@@ -1,6 +1,6 @@
 # Clinic Management SaaS — Backend Team & API Contract
 
-**Version:** 1.5
+**Version:** 1.6
 **Authors:** Parth + Anuj | Java Spring Boot Backend
 **Status:** Binding. Endpoint shapes, the response envelope, and the canonical `ErrorCode` values
 defined here take precedence over anything improvised during implementation.
@@ -710,10 +710,30 @@ Response:
         "patient": { "patientId": "uuid", "name": "Anuj Kumar", "phone": "+919876543210" },
         "startTime": "10:00:00",
         "endTime": "10:30:00",
-        "status": "CONFIRMED"
+        "status": "CONFIRMED",
+        "noShowRisk": { "probability": 0.37, "band": "HIGH", "modelVersion": "gradient_boosting-202610260000" }
       }
     ]
   }
+}
+```
+
+`noShowRisk` is **added in v1.6** and optional; see section 26. It is omitted
+when the ML service is off or failing, and on appointments that already have an
+outcome, so a v1.5 client reads the response unchanged.
+
+Also added in v1.6 and optional, see section 27: `symptoms`, the codes the
+patient reported when booking, and `conditionHints`:
+
+```json
+"symptoms": ["high_fever", "joint_pain"],
+"conditionHints": {
+  "modelVersion": "conditions-logistic-202610260000",
+  "conditions": [
+    { "name": "Dengue", "probability": 0.62 },
+    { "name": "Chicken pox", "probability": 0.11 },
+    { "name": "Malaria", "probability": 0.08 }
+  ]
 }
 ```
 
@@ -726,6 +746,23 @@ Response:
   "success": true,
   "message": "Appointment marked as completed",
   "data": { "appointmentId": "uuid", "status": "COMPLETED", "followUpEligible": true }
+}
+```
+
+### PATCH /api/v1/appointments/{appointmentId}/no-show
+
+**Added in v1.6.** Treating doctor or admin. Before this nothing could set
+`NO_SHOW`, so a missed visit looked the same as one nobody closed out.
+
+Only a `CONFIRMED` appointment whose start time has passed qualifies; anything
+else is `422 VALIDATION_ERROR`. An unpaid hold is cancelled by the hold sweep
+instead (section 12).
+
+```json
+{
+  "success": true,
+  "message": "Appointment marked as a no-show",
+  "data": { "appointmentId": "uuid", "status": "NO_SHOW" }
 }
 ```
 
@@ -1010,6 +1047,17 @@ Voice is read-only by design: it answers questions and refuses to book, cancel
 or advise. The speech models are CC-BY-NC and must be replaced before sale
 (D28).
 
+### 23f. Version 1.6 Change Log
+
+Version 1.6 adds no-show risk (section 26): an optional `noShowRisk` on each
+appointment in a doctor's daily list, from a self-hosted model that is off by
+default. It also adds `PATCH /appointments/{id}/no-show`, without which no
+appointment could ever reach `NO_SHOW`.
+
+It also adds condition hints (section 27): an optional `symptoms` list on
+`POST /appointments`, `GET /symptoms` for the vocabulary, and `symptoms` plus
+`conditionHints` on the doctor's daily list. All of it is additive.
+
 ### 23b. Version 1.2 Change Log
 
 Version 1.2 closes a privilege escalation in registration, and lets a doctor
@@ -1099,6 +1147,86 @@ It answers questions. It does **not** book, cancel or reschedule, and it does
 not give medical advice. Recognition mishears — "अपॉइंटमेंट" is routinely
 garbled — and a misheard cancellation would destroy a real appointment. Acting
 on speech requires a spoken confirmation step, which is a later phase.
+
+## 26. No-show risk (v1.6)
+
+How likely each appointment on a doctor's day is to be missed, so the front desk
+knows whom to call ahead. The model runs in `ml-service/` on the clinic's own
+hardware; attendance history never leaves it.
+
+Risk appears **only when `clinic.ml.enabled` is true** and the service answers
+within its timeout (2 s by default). Otherwise `noShowRisk` is simply absent and
+the schedule is served as in v1.5: the risk is a hint on the schedule, never a
+reason for the schedule to fail. No endpoint is added for it.
+
+### Shape
+
+| Field | Notes |
+|---|---|
+| `probability` | 0 to 1, calibrated: 0.3 means roughly three in ten such appointments are missed. |
+| `band` | `LOW`, `MEDIUM` or `HIGH`. HIGH is the riskiest 20% of appointments, MEDIUM the next 30%. |
+| `modelVersion` | Which trained model produced it, for tracing a score back. |
+
+Scored only for `PENDING_PAYMENT` and `CONFIRMED` appointments. It is shown to
+the doctor on their own schedule and **never** to the patient, and nothing in
+the product acts on it automatically.
+
+### What the model sees
+
+Booking lead time in days, weekday of the visit, hour of booking, the patient's
+earlier completed and missed visits, and whether a reminder was sent or is
+scheduled. Nothing else - in particular no age, gender or medical details,
+which CliniQ does not collect.
+
+### Where it comes from
+
+Trained on the public Kaggle *Medical Appointment No Shows* dataset (Brazil,
+2016, CC BY-NC-SA). That population is not CliniQ's, so the numbers are a
+starting point to be retrained on CliniQ's own outcomes. Tracked as decision
+D29.
+
+## 27. Condition hints (v1.6)
+
+A patient may tick symptoms when booking. The treating doctor sees them on
+their schedule, with the three conditions the symptoms most resemble, so they
+can prepare before the visit. The model runs in `ml-service/`; symptoms never
+leave the clinic's hardware.
+
+**Never shown to the patient.** The patient sees only what they ticked and a
+fixed emergency notice. CliniQ does not tell a patient what they might have:
+the assistant and voice refuse medical questions for the same reason.
+
+### Booking — POST /api/v1/appointments
+
+`symptoms` is optional: up to 20 codes from `GET /symptoms`, each matching
+`[a-z0-9_]{1,60}`. Only the format is checked, so booking never depends on the
+ML service; a code the model does not know is stored and gives no hint.
+
+### Vocabulary — GET /api/v1/symptoms
+
+```json
+{ "success": true, "data": { "symptoms": [ { "code": "skin_rash", "label": "Skin rash" } ] } }
+```
+
+Authenticated. **Present only when `clinic.ml.enabled` is true**; otherwise a
+404, and the booking page shows no picker. `503` when enabled but the service
+is not answering.
+
+### On the schedule
+
+`symptoms` appears whenever the patient reported any. `conditionHints` appears
+only for a live appointment with **at least two** symptoms the model knows, and
+when the ML service answers in time. With one symptom any ranking is mostly the
+model's prior, so it gives none.
+
+### Where it comes from
+
+Logistic regression trained on the Kaggle *Disease Prediction Using Machine
+Learning* dataset (kaushil268, DbCL 1.0): 131 symptoms, 41 conditions. The
+dataset is synthetic and its 4,920 rows are only 305 distinct cases, so it says
+nothing about real prevalence. Measured on held-out cases, the right condition
+is in the top three 99% of the time with half the symptoms hidden, and 89% with
+only two. Real patients will do worse. Tracked as decision D30.
 
 ## 24. Versioning
 
