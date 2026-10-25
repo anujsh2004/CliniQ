@@ -6,6 +6,7 @@ import com.clinic.dto.response.AppointmentListItem;
 import com.clinic.dto.response.AppointmentRescheduledResponse;
 import com.clinic.dto.response.DoctorDayAppointment;
 import com.clinic.dto.response.DoctorParty;
+import com.clinic.dto.response.NoShowRisk;
 import com.clinic.dto.response.PatientParty;
 import com.clinic.entity.Appointment;
 import com.clinic.entity.Slot;
@@ -60,6 +61,10 @@ public class AppointmentMapper {
 
     /** The doctor's own daily list carries the patient's phone (contract 13). */
     public DoctorDayAppointment toDayAppointment(Appointment appointment) {
+        return toDayAppointment(appointment, null);
+    }
+
+    public DoctorDayAppointment toDayAppointment(Appointment appointment, NoShowRisk noShowRisk) {
         Slot slot = appointment.getSlot();
         return new DoctorDayAppointment(
                 appointment.getId().toString(),
@@ -68,7 +73,8 @@ public class AppointmentMapper {
                         appointment.getPatient().getUser().getPhone()),
                 slot.getStartTime(),
                 slot.getEndTime(),
-                appointment.getStatus());
+                appointment.getStatus(),
+                noShowRisk);
     }
 
     public AppointmentRescheduledResponse toRescheduled(Appointment appointment) {

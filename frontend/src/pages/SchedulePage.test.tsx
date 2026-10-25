@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SchedulePage } from './SchedulePage';
 import { ToastProvider } from '@/components/Toast';
 import { ApiRequestError } from '@/api/client';
@@ -10,7 +10,7 @@ import type { DoctorDayAppointments } from '@/types/api';
 
 vi.mock('@/api/endpoints', () => ({
   doctors: { ownDay: vi.fn() },
-  appointments: { complete: vi.fn() },
+  appointments: { complete: vi.fn(), markNoShow: vi.fn() },
 }));
 
 function day(overrides: Partial<DoctorDayAppointments> = {}): DoctorDayAppointments {
@@ -53,6 +53,17 @@ describe('SchedulePage', () => {
   beforeEach(() => {
     vi.mocked(doctors.ownDay).mockResolvedValue(day());
     vi.mocked(appointments.complete).mockReset();
+    vi.mocked(appointments.markNoShow).mockReset();
+    // Only Date is faked: noon today, so the 09:00 visit has started and the
+    // 10:00 one too, whatever time the suite actually runs.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const noon = new Date();
+    noon.setHours(12, 0, 0, 0);
+    vi.setSystemTime(noon);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('shows the day with each patient and their phone number', async () => {
@@ -110,5 +121,56 @@ describe('SchedulePage', () => {
     await waitFor(() =>
       expect(screen.getByText('Nothing booked on this date')).toBeInTheDocument(),
     );
+  });
+
+  it('flags a high no-show risk but stays quiet about a low one', async () => {
+    const base = day();
+    vi.mocked(doctors.ownDay).mockResolvedValue({
+      ...base,
+      appointments: [
+        { ...base.appointments[0], noShowRisk: { probability: 0.42, band: 'HIGH', modelVersion: 'v1' } },
+        {
+          ...base.appointments[0],
+          appointmentId: 'appt-3',
+          patient: { patientId: 'pat-3', name: 'Meena Iyer' },
+          noShowRisk: { probability: 0.08, band: 'LOW', modelVersion: 'v1' },
+        },
+      ],
+    });
+    renderPage();
+
+    expect(await screen.findByText(/High no-show risk · 42%/)).toBeInTheDocument();
+    expect(screen.queryByText(/no-show risk · 8%/)).not.toBeInTheDocument();
+  });
+
+  it('shows no risk at all when the schedule carries none', async () => {
+    renderPage();
+
+    await screen.findByText('Anjali Verma');
+    expect(screen.queryByText(/no-show risk/)).not.toBeInTheDocument();
+  });
+
+  it('marks a confirmed visit that has started as a no-show', async () => {
+    const user = userEvent.setup();
+    vi.mocked(appointments.markNoShow).mockResolvedValue({ appointmentId: 'appt-1', status: 'NO_SHOW' });
+    renderPage();
+
+    // Only the CONFIRMED row offers it; the COMPLETED one already has an outcome.
+    const buttons = await screen.findAllByRole('button', { name: /No-show/ });
+    expect(buttons).toHaveLength(1);
+    await user.click(buttons[0]);
+
+    expect(await screen.findByText('Marked as a no-show.')).toBeInTheDocument();
+    expect(appointments.markNoShow).toHaveBeenCalledWith('appt-1');
+  });
+
+  it('does not offer a no-show before the visit starts', async () => {
+    const early = new Date();
+    early.setHours(8, 0, 0, 0);
+    vi.setSystemTime(early);
+    renderPage();
+
+    await screen.findByText('Anjali Verma');
+    expect(screen.queryByRole('button', { name: /No-show/ })).not.toBeInTheDocument();
   });
 });

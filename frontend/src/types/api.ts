@@ -150,12 +150,20 @@ export interface AppointmentDetail {
   paymentStatus: PaymentStatus;
 }
 
+/** Added in v1.6 (API contract 26). Absent when the ML service is off. */
+export interface NoShowRisk {
+  probability: number;
+  band: 'LOW' | 'MEDIUM' | 'HIGH';
+  modelVersion: string;
+}
+
 export interface DoctorDayAppointment {
   appointmentId: string;
   patient: { patientId: string; name: string; phone?: string };
   startTime: string;
   endTime: string;
   status: AppointmentStatus;
+  noShowRisk?: NoShowRisk;
 }
 
 export interface DoctorDayAppointments {

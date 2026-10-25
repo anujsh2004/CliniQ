@@ -54,6 +54,26 @@ changes, update the contract first, then implement it.**
   the problem outright, or a different commercially licensed voice model. This
   must be resolved before CliniQ is sold, not before it is demonstrated.
 
+### D29 — The no-show model is trained on someone else's patients
+
+- **Where:** `feature/no-show-risk`; API contract 26; `ml-service/`
+- **Shipped:** a model trained on the Kaggle *Medical Appointment No Shows*
+  dataset - public appointments from Vitória, Brazil, in 2016 - scoring CliniQ
+  appointments in Bengaluru. Off by default (`clinic.ml.enabled`).
+- **What this means:** the ranking (who is riskier than whom) is likely to
+  carry over, because lead time and past no-shows predict missed visits almost
+  everywhere. The probabilities are less likely to: a different base rate makes
+  "37%" wrong even when the order is right. Bands are shares of appointments
+  rather than probability cut-offs for exactly this reason.
+- **Licence:** the dataset is **CC BY-NC-SA**. Like D28, fine to demonstrate,
+  not to sell. The CSV is never committed.
+- **Not modelled:** abandoned holds. Kaggle has no equivalent of a payment
+  hold, so there is nothing to learn it from; it needs CliniQ's own data.
+- **Needs:** a retraining job on CliniQ's own `COMPLETED` / `NO_SHOW` outcomes
+  once there are enough of them (a few thousand), which also removes the
+  licence problem. `PATCH /appointments/{id}/no-show` exists so those outcomes
+  are recorded at all.
+
 ### D2 — Data retention, PII and backup policy
 
 - **Where:** `product-description.md` §22 item 7

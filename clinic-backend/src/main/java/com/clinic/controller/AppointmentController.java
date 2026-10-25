@@ -92,4 +92,11 @@ public class AppointmentController {
         return ResponseEntity.ok(ApiResponse.success("Appointment marked as completed",
                 appointmentQueryService.complete(appointmentId)));
     }
+
+    @PatchMapping("/{appointmentId}/no-show")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
+    public ResponseEntity<ApiResponse<AppointmentStatusResponse>> noShow(@PathVariable UUID appointmentId) {
+        return ResponseEntity.ok(ApiResponse.success("Appointment marked as a no-show",
+                appointmentQueryService.markNoShow(appointmentId)));
+    }
 }

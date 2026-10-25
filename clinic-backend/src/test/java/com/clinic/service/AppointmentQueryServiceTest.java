@@ -12,7 +12,10 @@ import com.clinic.exception.ApiException;
 import com.clinic.exception.AppointmentNotFoundException;
 import com.clinic.exception.ErrorCode;
 import com.clinic.exception.FieldValidationException;
+import com.clinic.dto.response.NoShowRisk;
 import com.clinic.mapper.AppointmentMapper;
+import com.clinic.ml.NoShowRiskService;
+import com.clinic.ml.RiskBand;
 import com.clinic.repository.AppointmentRepository;
 import com.clinic.repository.DoctorRepository;
 import com.clinic.security.AuthenticatedUser;
@@ -24,12 +27,15 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -44,9 +50,10 @@ class AppointmentQueryServiceTest {
     private final AppointmentRepository appointmentRepository = mock(AppointmentRepository.class);
     private final DoctorRepository doctorRepository = mock(DoctorRepository.class);
     private final PatientService patientService = mock(PatientService.class);
+    private final NoShowRiskService noShowRiskService = mock(NoShowRiskService.class);
 
     private final AppointmentQueryService service = new AppointmentQueryService(
-            appointmentRepository, doctorRepository, patientService, new AppointmentMapper());
+            appointmentRepository, doctorRepository, patientService, new AppointmentMapper(), noShowRiskService);
 
     @AfterEach
     void clearSecurityContext() {
@@ -209,5 +216,90 @@ class AppointmentQueryServiceTest {
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.UNAUTHORIZED_ACCESS);
+    }
+
+    @Test
+    void theDailyListCarriesNoShowRiskWhenTheModelGivesOne() {
+        UUID doctorUserId = UUID.randomUUID();
+        Appointment appointment = appointment(UUID.randomUUID(), doctorUserId, AppointmentStatus.CONFIRMED);
+        Doctor doctor = appointment.getDoctor();
+        LocalDate date = LocalDate.of(2026, 8, 20);
+        when(doctorRepository.findByUserId(doctorUserId)).thenReturn(Optional.of(doctor));
+        when(appointmentRepository.findForDoctorOnDate(doctor.getId(), date)).thenReturn(List.of(appointment));
+        when(noShowRiskService.score(eq(date), anyList())).thenReturn(Map.of(appointment.getId(),
+                new NoShowRisk(0.41, RiskBand.HIGH, "gradient_boosting-test")));
+        authenticateAs(doctorUserId, Role.DOCTOR);
+
+        var risk = service.listOwnDay(date).appointments().getFirst().noShowRisk();
+
+        assertThat(risk.band()).isEqualTo(RiskBand.HIGH);
+        assertThat(risk.probability()).isEqualTo(0.41);
+    }
+
+    @Test
+    void withoutAModelTheDailyListIsUnchanged() {
+        // The v1.5 response, exactly: no risk field at all.
+        UUID doctorUserId = UUID.randomUUID();
+        Appointment appointment = appointment(UUID.randomUUID(), doctorUserId, AppointmentStatus.CONFIRMED);
+        Doctor doctor = appointment.getDoctor();
+        when(doctorRepository.findByUserId(doctorUserId)).thenReturn(Optional.of(doctor));
+        when(appointmentRepository.findForDoctorOnDate(any(), any())).thenReturn(List.of(appointment));
+        when(noShowRiskService.score(any(), anyList())).thenReturn(Map.of());
+        authenticateAs(doctorUserId, Role.DOCTOR);
+
+        assertThat(service.listOwnDay(LocalDate.of(2026, 8, 20)).appointments().getFirst().noShowRisk()).isNull();
+    }
+
+    @Test
+    void theTreatingDoctorMarksAPastConfirmedAppointmentAsANoShow() {
+        UUID doctorUserId = UUID.randomUUID();
+        Appointment appointment = appointment(UUID.randomUUID(), doctorUserId, AppointmentStatus.CONFIRMED);
+        appointment.getSlot().setDate(LocalDate.now().minusDays(1));
+        when(appointmentRepository.findWithDetailsById(appointment.getId())).thenReturn(Optional.of(appointment));
+        authenticateAs(doctorUserId, Role.DOCTOR);
+
+        var response = service.markNoShow(appointment.getId());
+
+        assertThat(response.status()).isEqualTo(AppointmentStatus.NO_SHOW);
+        assertThat(response.followUpEligible()).isNull();
+        verify(appointmentRepository).save(appointment);
+    }
+
+    @Test
+    void anAppointmentThatHasNotStartedCannotBeANoShow() {
+        UUID doctorUserId = UUID.randomUUID();
+        Appointment appointment = appointment(UUID.randomUUID(), doctorUserId, AppointmentStatus.CONFIRMED);
+        appointment.getSlot().setDate(LocalDate.now().plusDays(1));
+        when(appointmentRepository.findWithDetailsById(appointment.getId())).thenReturn(Optional.of(appointment));
+        authenticateAs(doctorUserId, Role.DOCTOR);
+
+        assertThatThrownBy(() -> service.markNoShow(appointment.getId()))
+                .isInstanceOf(FieldValidationException.class);
+        verify(appointmentRepository, never()).save(any());
+    }
+
+    @Test
+    void anUnpaidHoldCannotBeANoShow() {
+        // The hold sweep cancels it instead; a no-show is a confirmed visit missed.
+        UUID doctorUserId = UUID.randomUUID();
+        Appointment appointment = appointment(UUID.randomUUID(), doctorUserId, AppointmentStatus.PENDING_PAYMENT);
+        appointment.getSlot().setDate(LocalDate.now().minusDays(1));
+        when(appointmentRepository.findWithDetailsById(appointment.getId())).thenReturn(Optional.of(appointment));
+        authenticateAs(doctorUserId, Role.DOCTOR);
+
+        assertThatThrownBy(() -> service.markNoShow(appointment.getId()))
+                .isInstanceOf(FieldValidationException.class);
+    }
+
+    @Test
+    void anotherDoctorCannotMarkANoShow() {
+        Appointment appointment = appointment(UUID.randomUUID(), UUID.randomUUID(), AppointmentStatus.CONFIRMED);
+        appointment.getSlot().setDate(LocalDate.now().minusDays(1));
+        when(appointmentRepository.findWithDetailsById(appointment.getId())).thenReturn(Optional.of(appointment));
+        authenticateAs(UUID.randomUUID(), Role.DOCTOR);
+
+        assertThatThrownBy(() -> service.markNoShow(appointment.getId()))
+                .isInstanceOf(ApiException.class);
+        verify(appointmentRepository, never()).save(any());
     }
 }

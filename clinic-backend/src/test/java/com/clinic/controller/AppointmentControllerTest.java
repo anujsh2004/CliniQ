@@ -122,6 +122,28 @@ class AppointmentControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "DOCTOR")
+    void markingANoShowReturnsTheNewStatus() throws Exception {
+        UUID appointmentId = UUID.randomUUID();
+        when(appointmentQueryService.markNoShow(appointmentId)).thenReturn(
+                AppointmentStatusResponse.of(appointmentId.toString(), AppointmentStatus.NO_SHOW));
+
+        mockMvc.perform(patch("/api/v1/appointments/" + appointmentId + "/no-show"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Appointment marked as a no-show"))
+                .andExpect(jsonPath("$.data.status").value("NO_SHOW"))
+                .andExpect(jsonPath("$.data.followUpEligible").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(roles = "PATIENT")
+    void aPatientCannotMarkTheirOwnNoShow() throws Exception {
+        mockMvc.perform(patch("/api/v1/appointments/" + UUID.randomUUID() + "/no-show"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED_ACCESS"));
+    }
+
+    @Test
     @WithMockUser(roles = "PATIENT")
     void anUnknownAppointmentIs404() throws Exception {
         when(appointmentQueryService.get(any())).thenThrow(new AppointmentNotFoundException());

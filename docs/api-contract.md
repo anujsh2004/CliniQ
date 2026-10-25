@@ -1,6 +1,6 @@
 # Clinic Management SaaS — Backend Team & API Contract
 
-**Version:** 1.5
+**Version:** 1.6
 **Authors:** Parth + Anuj | Java Spring Boot Backend
 **Status:** Binding. Endpoint shapes, the response envelope, and the canonical `ErrorCode` values
 defined here take precedence over anything improvised during implementation.
@@ -710,12 +710,17 @@ Response:
         "patient": { "patientId": "uuid", "name": "Anuj Kumar", "phone": "+919876543210" },
         "startTime": "10:00:00",
         "endTime": "10:30:00",
-        "status": "CONFIRMED"
+        "status": "CONFIRMED",
+        "noShowRisk": { "probability": 0.37, "band": "HIGH", "modelVersion": "gradient_boosting-202610260000" }
       }
     ]
   }
 }
 ```
+
+`noShowRisk` is **added in v1.6** and optional; see section 26. It is omitted
+when the ML service is off or failing, and on appointments that already have an
+outcome, so a v1.5 client reads the response unchanged.
 
 ### PATCH /api/v1/appointments/{appointmentId}/complete
 
@@ -726,6 +731,23 @@ Response:
   "success": true,
   "message": "Appointment marked as completed",
   "data": { "appointmentId": "uuid", "status": "COMPLETED", "followUpEligible": true }
+}
+```
+
+### PATCH /api/v1/appointments/{appointmentId}/no-show
+
+**Added in v1.6.** Treating doctor or admin. Before this nothing could set
+`NO_SHOW`, so a missed visit looked the same as one nobody closed out.
+
+Only a `CONFIRMED` appointment whose start time has passed qualifies; anything
+else is `422 VALIDATION_ERROR`. An unpaid hold is cancelled by the hold sweep
+instead (section 12).
+
+```json
+{
+  "success": true,
+  "message": "Appointment marked as a no-show",
+  "data": { "appointmentId": "uuid", "status": "NO_SHOW" }
 }
 ```
 
@@ -1010,6 +1032,13 @@ Voice is read-only by design: it answers questions and refuses to book, cancel
 or advise. The speech models are CC-BY-NC and must be replaced before sale
 (D28).
 
+### 23f. Version 1.6 Change Log
+
+Version 1.6 adds no-show risk (section 26): an optional `noShowRisk` on each
+appointment in a doctor's daily list, from a self-hosted model that is off by
+default. It also adds `PATCH /appointments/{id}/no-show`, without which no
+appointment could ever reach `NO_SHOW`. Both are additive.
+
 ### 23b. Version 1.2 Change Log
 
 Version 1.2 closes a privilege escalation in registration, and lets a doctor
@@ -1099,6 +1128,43 @@ It answers questions. It does **not** book, cancel or reschedule, and it does
 not give medical advice. Recognition mishears — "अपॉइंटमेंट" is routinely
 garbled — and a misheard cancellation would destroy a real appointment. Acting
 on speech requires a spoken confirmation step, which is a later phase.
+
+## 26. No-show risk (v1.6)
+
+How likely each appointment on a doctor's day is to be missed, so the front desk
+knows whom to call ahead. The model runs in `ml-service/` on the clinic's own
+hardware; attendance history never leaves it.
+
+Risk appears **only when `clinic.ml.enabled` is true** and the service answers
+within its timeout (2 s by default). Otherwise `noShowRisk` is simply absent and
+the schedule is served as in v1.5: the risk is a hint on the schedule, never a
+reason for the schedule to fail. No endpoint is added for it.
+
+### Shape
+
+| Field | Notes |
+|---|---|
+| `probability` | 0 to 1, calibrated: 0.3 means roughly three in ten such appointments are missed. |
+| `band` | `LOW`, `MEDIUM` or `HIGH`. HIGH is the riskiest 20% of appointments, MEDIUM the next 30%. |
+| `modelVersion` | Which trained model produced it, for tracing a score back. |
+
+Scored only for `PENDING_PAYMENT` and `CONFIRMED` appointments. It is shown to
+the doctor on their own schedule and **never** to the patient, and nothing in
+the product acts on it automatically.
+
+### What the model sees
+
+Booking lead time in days, weekday of the visit, hour of booking, the patient's
+earlier completed and missed visits, and whether a reminder was sent or is
+scheduled. Nothing else - in particular no age, gender or medical details,
+which CliniQ does not collect.
+
+### Where it comes from
+
+Trained on the public Kaggle *Medical Appointment No Shows* dataset (Brazil,
+2016, CC BY-NC-SA). That population is not CliniQ's, so the numbers are a
+starting point to be retrained on CliniQ's own outcomes. Tracked as decision
+D29.
 
 ## 24. Versioning
 

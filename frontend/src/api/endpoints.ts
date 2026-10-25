@@ -159,6 +159,11 @@ export const appointments = {
       `/appointments/${appointmentId}/complete`,
       { method: 'PATCH' },
     ),
+
+  markNoShow: (appointmentId: string) =>
+    request<{ appointmentId: string; status: string }>(`/appointments/${appointmentId}/no-show`, {
+      method: 'PATCH',
+    }),
 };
 
 export const notifications = {

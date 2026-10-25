@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# The Kaggle CSV is CC BY-NC-SA and is downloaded by hand, never committed.
+data/
+# Trained models are rebuilt from the data by train.py.
+models/

@@ -147,6 +147,15 @@ clinic:
     # Hindi and Tamil are recognised by IndicConformer, English by Whisper.
     languages: [ hi, ta, en ]
 
+  ml:
+    # Off by default: risk is a hint on the doctor's schedule, and a checkout
+    # without the Python service in ml-service/ must serve the schedule as
+    # before. Turn it on only where that service is running with a model.
+    enabled: ${CLINIC_ML_ENABLED:false}
+    base-url: ${CLINIC_ML_URL:http://localhost:8002}
+    # Short: a slow model costs the doctor the risk badges, not the schedule.
+    timeout: ${CLINIC_ML_TIMEOUT:2s}
+
   payments:
     razorpay:
       # With no key id the application falls back to the stub gateway, so the
