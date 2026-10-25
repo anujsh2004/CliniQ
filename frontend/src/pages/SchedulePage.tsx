@@ -4,6 +4,7 @@ import { ApiRequestError } from '@/api/client';
 import { appointments, doctors } from '@/api/endpoints';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
+import { ConditionHintsPanel } from '@/components/ConditionHintsPanel';
 import { DateStrip } from '@/components/DateStrip';
 import { PageHeader } from '@/components/PageHeader';
 import { RiskBadge } from '@/components/RiskBadge';
@@ -157,6 +158,10 @@ export function SchedulePage() {
                     </Button>
                   )}
                 </div>
+                <ConditionHintsPanel
+                  symptoms={appointment.symptoms}
+                  hints={appointment.conditionHints}
+                />
               </Card>
             ))}
           </div>

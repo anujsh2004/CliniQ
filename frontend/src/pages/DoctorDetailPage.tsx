@@ -10,6 +10,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { SlotGrid } from '@/components/SlotGrid';
 import { EmptyState, ErrorState, SkeletonGrid } from '@/components/States';
 import { Stepper, type Step } from '@/components/Stepper';
+import { SymptomPicker } from '@/components/SymptomPicker';
 import { useToast } from '@/components/Toast';
 import { formatDate, formatFee, formatTime, upcomingDates } from '@/lib/format';
 
@@ -32,6 +33,7 @@ export function DoctorDetailPage() {
   const [selectedSlotId, setSelectedSlotId] = useState<string | undefined>();
   const [staleSlotId, setStaleSlotId] = useState<string | undefined>();
   const [reason, setReason] = useState('');
+  const [chosenSymptoms, setChosenSymptoms] = useState<string[]>([]);
 
   const doctorQuery = useQuery({
     queryKey: ['doctor', doctorId],
@@ -44,7 +46,13 @@ export function DoctorDetailPage() {
   });
 
   const booking = useMutation({
-    mutationFn: (slotId: string) => appointments.book({ doctorId, slotId, reason: reason.trim() }),
+    mutationFn: (slotId: string) =>
+      appointments.book({
+        doctorId,
+        slotId,
+        reason: reason.trim(),
+        ...(chosenSymptoms.length > 0 && { symptoms: chosenSymptoms }),
+      }),
     onSuccess: () => {
       toast.success('Appointment booked');
       void queryClient.invalidateQueries({ queryKey: ['appointments'] });
@@ -164,6 +172,8 @@ export function DoctorDetailPage() {
               className="rounded-card border border-border bg-surface px-3 py-2 text-body"
             />
           </div>
+
+          <SymptomPicker selected={chosenSymptoms} onChange={setChosenSymptoms} />
 
           <div className="mt-6 flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setSelectedSlotId(undefined)}>

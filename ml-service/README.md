@@ -1,14 +1,23 @@
-# No-show risk service
+# ML service
 
-Predicts how likely each appointment on a doctor's day is to be missed, so the
-front desk knows whom to call ahead. The backend sends the day's appointments
-and shows the result as a badge on the doctor's schedule (API contract 26).
+Two self-hosted models for CliniQ, both shown to the doctor on their schedule
+and never to the patient:
+
+1. **No-show risk** - how likely each appointment is to be missed, so the
+   front desk knows whom to call ahead (API contract 26).
+2. **Condition hints** - for patients who tick symptoms when booking, the
+   three conditions those symptoms most resemble (API contract 27). See
+   [Condition hints](#condition-hints) below.
 
 | Piece | What it is |
 |---|---|
-| `features.py` | The seven features the model sees, and how they are built from the Kaggle data |
-| `train.py` | Trains, evaluates and saves the model to `models/` |
-| `app.py` | FastAPI service that loads the model and scores appointments |
+| `features.py` | The seven no-show features, and how they are built from the Kaggle data |
+| `train.py` | Trains, evaluates and saves the no-show model to `models/` |
+| `conditions.py` | Loads and cleans the symptom dataset; hides symptoms to mimic real patients |
+| `train_conditions.py` | Trains, evaluates and saves the condition model to `models/` |
+| `app.py` | FastAPI service that loads both models and serves them |
+
+Either model can be missing; the other keeps working.
 
 ## Why only these features
 
@@ -106,14 +115,74 @@ are shares, not fixed probability cut-offs, because a cut-off learned on
 Brazilian data would not mean the same thing in a clinic with a different
 no-show rate.
 
+## Condition hints
+
+### The dataset
+
+Kaggle's *Disease Prediction Using Machine Learning* (kaushil268, DbCL 1.0):
+132 yes/no symptom columns and one of 41 diseases per row. With the Kaggle
+token in place:
+
+```bash
+uv pip install kaggle
+.venv/Scripts/kaggle datasets download -d kaushil268/disease-prediction-using-machine-learning -p data/symptoms --unzip
+```
+
+It is **synthetic**. Its 4,920 training rows are only 304 distinct symptom sets
+repeated, and 41 of its 42 test rows also appear in training, which is why it
+is famous for 100% accuracy. `conditions.py` removes the duplicates before
+anything is split, cleans the column names (`spotting_ urination`) and fixes
+misspelt diseases (`Peptic ulcer diseae`).
+
+### Training
+
+```bash
+uv run --no-project python train_conditions.py
+```
+
+Every row lists a condition's complete symptom set, but a patient ticking boxes
+reports some of their symptoms, not all. So training uses cases with symptoms
+randomly hidden (keeping 40-100% of each), and the held-out cases are scored
+three ways. Most recent run, logistic regression chosen over Naive Bayes:
+
+| Held-out cases | Right condition first | Right condition in top 3 |
+|---|---|---|
+| All symptoms (as the dataset has them) | 98.9% | 100% |
+| Half the symptoms | 94.2% | 99.0% |
+| **Only two symptoms** | **71.6%** | **89.5%** |
+
+The last row is the most honest one, and still an upper bound: real patients
+are messier than generated data.
+
+### Scoring by hand
+
+```bash
+curl -X POST http://localhost:8002/conditions -H "Content-Type: application/json" -d '{
+  "cases": [{ "caseId": "a-1", "symptoms": ["high_fever", "joint_pain", "skin_rash"] }]
+}'
+```
+
+Returns the top three conditions with probabilities. Fewer than two known
+symptoms returns an empty list, and unknown codes are listed in
+`unknownSymptoms` rather than refused. `GET /symptoms` lists the vocabulary
+with readable labels.
+
+### Why the patient never sees this
+
+A ranked list of diseases on a patient's screen reads as a diagnosis, and
+CliniQ refuses to give medical advice everywhere else. The booking page shows
+the patient only what they ticked and a fixed emergency notice that does not
+depend on the model. This is decision support for a doctor, not a medical
+device (D30).
+
 ## Tests
 
 ```bash
 uv run --no-project python -m pytest
 ```
 
-The tests train on a synthetic frame in the Kaggle CSV's exact shape, so they
-need neither the real dataset nor a network connection.
+The tests train on small synthetic frames in each Kaggle CSV's exact shape,
+quirks included, so they need neither real dataset nor a network connection.
 
 ## Limits
 

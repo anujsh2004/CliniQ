@@ -157,6 +157,18 @@ export interface NoShowRisk {
   modelVersion: string;
 }
 
+/** A symptom a patient may report when booking (API contract 27). */
+export interface Symptom {
+  code: string;
+  label: string;
+}
+
+/** Added in v1.6 (API contract 27). For the treating doctor only. */
+export interface ConditionHints {
+  modelVersion: string;
+  conditions: { name: string; probability: number }[];
+}
+
 export interface DoctorDayAppointment {
   appointmentId: string;
   patient: { patientId: string; name: string; phone?: string };
@@ -164,6 +176,8 @@ export interface DoctorDayAppointment {
   endTime: string;
   status: AppointmentStatus;
   noShowRisk?: NoShowRisk;
+  symptoms?: string[];
+  conditionHints?: ConditionHints;
 }
 
 export interface DoctorDayAppointments {

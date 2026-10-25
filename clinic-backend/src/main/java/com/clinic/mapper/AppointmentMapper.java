@@ -4,6 +4,7 @@ import com.clinic.dto.response.AppointmentCreatedResponse;
 import com.clinic.dto.response.AppointmentDetailResponse;
 import com.clinic.dto.response.AppointmentListItem;
 import com.clinic.dto.response.AppointmentRescheduledResponse;
+import com.clinic.dto.response.ConditionHints;
 import com.clinic.dto.response.DoctorDayAppointment;
 import com.clinic.dto.response.DoctorParty;
 import com.clinic.dto.response.NoShowRisk;
@@ -61,10 +62,11 @@ public class AppointmentMapper {
 
     /** The doctor's own daily list carries the patient's phone (contract 13). */
     public DoctorDayAppointment toDayAppointment(Appointment appointment) {
-        return toDayAppointment(appointment, null);
+        return toDayAppointment(appointment, null, null);
     }
 
-    public DoctorDayAppointment toDayAppointment(Appointment appointment, NoShowRisk noShowRisk) {
+    public DoctorDayAppointment toDayAppointment(Appointment appointment, NoShowRisk noShowRisk,
+                                                 ConditionHints conditionHints) {
         Slot slot = appointment.getSlot();
         return new DoctorDayAppointment(
                 appointment.getId().toString(),
@@ -74,7 +76,11 @@ public class AppointmentMapper {
                 slot.getStartTime(),
                 slot.getEndTime(),
                 appointment.getStatus(),
-                noShowRisk);
+                noShowRisk,
+                // Sorted, so the same symptoms always read the same way; null
+                // rather than empty, so the field is omitted.
+                appointment.getSymptoms().isEmpty() ? null : appointment.getSymptoms().stream().sorted().toList(),
+                conditionHints);
     }
 
     public AppointmentRescheduledResponse toRescheduled(Appointment appointment) {

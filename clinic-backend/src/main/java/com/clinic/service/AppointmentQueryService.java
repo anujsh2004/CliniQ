@@ -3,6 +3,7 @@ package com.clinic.service;
 import com.clinic.dto.response.AppointmentDetailResponse;
 import com.clinic.dto.response.AppointmentListItem;
 import com.clinic.dto.response.AppointmentStatusResponse;
+import com.clinic.dto.response.ConditionHints;
 import com.clinic.dto.response.DoctorDayAppointment;
 import com.clinic.dto.response.DoctorDayAppointmentsResponse;
 import com.clinic.dto.response.NoShowRisk;
@@ -16,6 +17,7 @@ import com.clinic.exception.AppointmentNotFoundException;
 import com.clinic.exception.ErrorCode;
 import com.clinic.exception.FieldValidationException;
 import com.clinic.mapper.AppointmentMapper;
+import com.clinic.ml.ConditionHintService;
 import com.clinic.ml.NoShowRiskService;
 import com.clinic.repository.AppointmentRepository;
 import com.clinic.repository.DoctorRepository;
@@ -53,17 +55,20 @@ public class AppointmentQueryService {
 
     private final AppointmentMapper appointmentMapper;
     private final NoShowRiskService noShowRiskService;
+    private final ConditionHintService conditionHintService;
 
     public AppointmentQueryService(AppointmentRepository appointmentRepository,
                                    DoctorRepository doctorRepository,
                                    PatientService patientService,
                                    AppointmentMapper appointmentMapper,
-                                   NoShowRiskService noShowRiskService) {
+                                   NoShowRiskService noShowRiskService,
+                                   ConditionHintService conditionHintService) {
         this.appointmentRepository = appointmentRepository;
         this.doctorRepository = doctorRepository;
         this.patientService = patientService;
         this.appointmentMapper = appointmentMapper;
         this.noShowRiskService = noShowRiskService;
+        this.conditionHintService = conditionHintService;
     }
 
     @Transactional
@@ -89,8 +94,10 @@ public class AppointmentQueryService {
         // Empty whenever the ML service is off or failing, which leaves the
         // response exactly as it was before v1.6.
         Map<UUID, NoShowRisk> risks = noShowRiskService.score(date, found);
+        Map<UUID, ConditionHints> hints = conditionHintService.hints(found);
         List<DoctorDayAppointment> appointments = found.stream()
-                .map(appointment -> appointmentMapper.toDayAppointment(appointment, risks.get(appointment.getId())))
+                .map(appointment -> appointmentMapper.toDayAppointment(appointment,
+                        risks.get(appointment.getId()), hints.get(appointment.getId())))
                 .toList();
         // date once, at the top level, as with the slot response.
         return new DoctorDayAppointmentsResponse(date, appointments);

@@ -62,3 +62,50 @@ def trained_model(kaggle_csv: Path, tmp_path_factory: pytest.TempPathFactory) ->
 
     model_path = tmp_path_factory.mktemp("models") / "no_show.joblib"
     return model_path, train.train(kaggle_csv, model_path)
+
+
+def symptom_like(seed: int = 0) -> pd.DataFrame:
+    """
+    A synthetic frame in the symptom dataset's exact shape, quirks included:
+    a column with a stray space, a pandas ".1" duplicate column, a misspelt
+    disease, and every row repeated, as the real Training.csv repeats them.
+    """
+    rng = np.random.default_rng(seed)
+    symptoms = ["itching", "skin_rash", "high_fever", "joint_pain", "spotting_ urination",
+                "burning_micturition", "chest_pain", "breathlessness", "fluid_overload", "fluid_overload.1"]
+    diseases = {
+        "Fungal infection": ["itching", "skin_rash"],
+        "Dengue": ["high_fever", "joint_pain", "skin_rash"],
+        "Urinary tract infection": ["spotting_ urination", "burning_micturition"],
+        "Heart attack": ["chest_pain", "breathlessness"],
+        "Peptic ulcer diseae": ["fluid_overload.1", "chest_pain"],
+    }
+    rows = []
+    for disease, core in diseases.items():
+        for _ in range(20):
+            row = {s: 0 for s in symptoms}
+            for s in core:
+                row[s] = 1
+            # Two random extras keep enough cases distinct after duplicates go.
+            for extra in rng.choice(len(symptoms), size=2, replace=False):
+                row[symptoms[extra]] = 1
+            row["prognosis"] = disease
+            rows.append(row)
+    frame = pd.DataFrame(rows)
+    return pd.concat([frame, frame], ignore_index=True)
+
+
+@pytest.fixture(scope="session")
+def symptom_csv(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    path = tmp_path_factory.mktemp("symptoms") / "Training.csv"
+    symptom_like().to_csv(path, index=False)
+    return path
+
+
+@pytest.fixture(scope="session")
+def trained_conditions(symptom_csv: Path, tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, dict]:
+    import train_conditions
+
+    model_path = tmp_path_factory.mktemp("models") / "conditions.joblib"
+    return model_path, train_conditions.train([symptom_csv], model_path)
+

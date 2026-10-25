@@ -12,8 +12,10 @@ import com.clinic.exception.ApiException;
 import com.clinic.exception.AppointmentNotFoundException;
 import com.clinic.exception.ErrorCode;
 import com.clinic.exception.FieldValidationException;
+import com.clinic.dto.response.ConditionHints;
 import com.clinic.dto.response.NoShowRisk;
 import com.clinic.mapper.AppointmentMapper;
+import com.clinic.ml.ConditionHintService;
 import com.clinic.ml.NoShowRiskService;
 import com.clinic.ml.RiskBand;
 import com.clinic.repository.AppointmentRepository;
@@ -51,9 +53,11 @@ class AppointmentQueryServiceTest {
     private final DoctorRepository doctorRepository = mock(DoctorRepository.class);
     private final PatientService patientService = mock(PatientService.class);
     private final NoShowRiskService noShowRiskService = mock(NoShowRiskService.class);
+    private final ConditionHintService conditionHintService = mock(ConditionHintService.class);
 
     private final AppointmentQueryService service = new AppointmentQueryService(
-            appointmentRepository, doctorRepository, patientService, new AppointmentMapper(), noShowRiskService);
+            appointmentRepository, doctorRepository, patientService, new AppointmentMapper(),
+            noShowRiskService, conditionHintService);
 
     @AfterEach
     void clearSecurityContext() {
@@ -301,5 +305,40 @@ class AppointmentQueryServiceTest {
         assertThatThrownBy(() -> service.markNoShow(appointment.getId()))
                 .isInstanceOf(ApiException.class);
         verify(appointmentRepository, never()).save(any());
+    }
+
+    @Test
+    void theDailyListCarriesReportedSymptomsAndConditionHints() {
+        UUID doctorUserId = UUID.randomUUID();
+        Appointment appointment = appointment(UUID.randomUUID(), doctorUserId, AppointmentStatus.CONFIRMED);
+        appointment.getSymptoms().addAll(List.of("joint_pain", "high_fever"));
+        Doctor doctor = appointment.getDoctor();
+        LocalDate date = LocalDate.of(2026, 8, 20);
+        when(doctorRepository.findByUserId(doctorUserId)).thenReturn(Optional.of(doctor));
+        when(appointmentRepository.findForDoctorOnDate(doctor.getId(), date)).thenReturn(List.of(appointment));
+        when(conditionHintService.hints(anyList())).thenReturn(Map.of(appointment.getId(),
+                new ConditionHints("conditions-test", List.of(new ConditionHints.Condition("Dengue", 0.62)))));
+        authenticateAs(doctorUserId, Role.DOCTOR);
+
+        var day = service.listOwnDay(date).appointments().getFirst();
+
+        // Sorted, so the list reads the same however it was stored.
+        assertThat(day.symptoms()).containsExactly("high_fever", "joint_pain");
+        assertThat(day.conditionHints().conditions().getFirst().name()).isEqualTo("Dengue");
+    }
+
+    @Test
+    void anAppointmentWithoutSymptomsOmitsBothFields() {
+        UUID doctorUserId = UUID.randomUUID();
+        Appointment appointment = appointment(UUID.randomUUID(), doctorUserId, AppointmentStatus.CONFIRMED);
+        Doctor doctor = appointment.getDoctor();
+        when(doctorRepository.findByUserId(doctorUserId)).thenReturn(Optional.of(doctor));
+        when(appointmentRepository.findForDoctorOnDate(any(), any())).thenReturn(List.of(appointment));
+        authenticateAs(doctorUserId, Role.DOCTOR);
+
+        var day = service.listOwnDay(LocalDate.of(2026, 8, 20)).appointments().getFirst();
+
+        assertThat(day.symptoms()).isNull();
+        assertThat(day.conditionHints()).isNull();
     }
 }

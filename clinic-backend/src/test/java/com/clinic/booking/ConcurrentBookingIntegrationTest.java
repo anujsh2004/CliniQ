@@ -271,6 +271,22 @@ class ConcurrentBookingIntegrationTest {
     }
 
     @Test
+    void reportedSymptomsAreStoredWithTheBookingAndReachTheDoctorsDay() {
+        // v1.6: the symptoms live in their own table, so this checks the
+        // mapping and the schedule query's fetch, not just the request.
+        Slot slot = availableSlot(LocalTime.of(14, 0));
+
+        authenticateAs(firstPatientUser);
+        bookingService.create(new CreateAppointmentRequest(doctor.getId(), slot.getId(), "Fever",
+                java.util.List.of("high_fever", "joint_pain")));
+        SecurityContextHolder.clearContext();
+
+        var day = appointmentRepository.findForDoctorOnDate(doctor.getId(), slot.getDate());
+        assertThat(day).hasSize(1);
+        assertThat(day.getFirst().getSymptoms()).containsExactlyInAnyOrder("high_fever", "joint_pain");
+    }
+
+    @Test
     void reschedulingReleasesTheOldSlotAndBooksTheNewOneAtomically() {
         Slot original = availableSlot(LocalTime.of(13, 0));
         Slot target = availableSlot(LocalTime.of(14, 0));

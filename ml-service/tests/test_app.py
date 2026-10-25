@@ -21,8 +21,9 @@ def features(appointment_id: str, lead_days: int, **overrides) -> dict:
 
 
 @pytest.fixture
-def client(trained_model, monkeypatch):
+def client(trained_model, trained_conditions, monkeypatch):
     monkeypatch.setattr(service, "MODEL_PATH", trained_model[0])
+    monkeypatch.setattr(service, "CONDITIONS_PATH", trained_conditions[0])
     with TestClient(service.app) as test_client:
         yield test_client
 
@@ -43,6 +44,7 @@ def test_health_reports_the_loaded_model(client: TestClient):
 
     assert body["status"] == "UP"
     assert body["modelVersion"]
+    assert body["conditions"]["status"] == "UP"
 
 
 def test_long_lead_time_scores_riskier_than_same_day(client: TestClient):
@@ -72,6 +74,11 @@ def test_empty_batch_returns_no_scores(client: TestClient):
 
 def test_without_a_model_scoring_is_unavailable(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(service, "MODEL_PATH", tmp_path / "missing.joblib")
+    monkeypatch.setattr(service, "CONDITIONS_PATH", tmp_path / "missing-conditions.joblib")
     with TestClient(service.app) as test_client:
-        assert test_client.get("/health").json()["status"] == "NO_MODEL"
+        health = test_client.get("/health").json()
+        assert health["status"] == "NO_MODEL"
+        assert health["conditions"]["status"] == "NO_MODEL"
         assert test_client.post("/score", json={"appointments": []}).status_code == 503
+        assert test_client.get("/symptoms").status_code == 503
+        assert test_client.post("/conditions", json={"cases": []}).status_code == 503

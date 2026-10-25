@@ -173,4 +173,29 @@ describe('SchedulePage', () => {
     await screen.findByText('Anjali Verma');
     expect(screen.queryByRole('button', { name: /No-show/ })).not.toBeInTheDocument();
   });
+
+  it('shows reported symptoms and the hints, labelled as not a diagnosis', async () => {
+    const base = day();
+    vi.mocked(doctors.ownDay).mockResolvedValue({
+      ...base,
+      appointments: [
+        {
+          ...base.appointments[0],
+          symptoms: ['high_fever', 'joint_pain'],
+          conditionHints: {
+            modelVersion: 'conditions-v1',
+            conditions: [
+              { name: 'Dengue', probability: 0.62 },
+              { name: 'Malaria', probability: 0.2 },
+            ],
+          },
+        },
+      ],
+    });
+    renderPage();
+
+    expect(await screen.findByText('High fever, Joint pain')).toBeInTheDocument();
+    expect(screen.getByText('Dengue 62% · Malaria 20%')).toBeInTheDocument();
+    expect(screen.getByText(/not a diagnosis/)).toBeInTheDocument();
+  });
 });

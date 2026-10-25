@@ -6,13 +6,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DoctorDetailPage } from './DoctorDetailPage';
 import { ToastProvider } from '@/components/Toast';
 import { ApiRequestError } from '@/api/client';
-import { appointments, doctors } from '@/api/endpoints';
+import { appointments, doctors, symptoms } from '@/api/endpoints';
 import { upcomingDates } from '@/lib/format';
 import type { DoctorDetail, DoctorSlots } from '@/types/api';
 
 vi.mock('@/api/endpoints', () => ({
   doctors: { get: vi.fn(), slots: vi.fn() },
   appointments: { book: vi.fn() },
+  symptoms: { list: vi.fn() },
 }));
 
 const DOCTOR: DoctorDetail = {
@@ -63,6 +64,10 @@ describe('DoctorDetailPage', () => {
     vi.mocked(doctors.get).mockResolvedValue(DOCTOR);
     vi.mocked(doctors.slots).mockImplementation((_id, date) => Promise.resolve(slotsFor(date)));
     vi.mocked(appointments.book).mockReset();
+    // The ML service is off unless a test says otherwise: /symptoms is a 404.
+    vi.mocked(symptoms.list).mockRejectedValue(
+      new ApiRequestError(404, { message: 'Not found', errors: [] }),
+    );
   });
 
   it('offers only available slots, grouped by time of day', async () => {
@@ -155,6 +160,54 @@ describe('DoctorDetailPage', () => {
 
     await waitFor(() =>
       expect(screen.queryByText('Confirm your appointment')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('has no symptom picker when the ML service is off', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /10:00/ }));
+
+    expect(screen.getByRole('button', { name: /Confirm booking/ })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Symptoms/)).not.toBeInTheDocument();
+  });
+
+  it('sends the symptoms the patient picks with the booking', async () => {
+    const user = userEvent.setup();
+    vi.mocked(symptoms.list).mockResolvedValue({
+      symptoms: [
+        { code: 'high_fever', label: 'High fever' },
+        { code: 'joint_pain', label: 'Joint pain' },
+        { code: 'skin_rash', label: 'Skin rash' },
+      ],
+    });
+    vi.mocked(appointments.book).mockResolvedValue({
+      appointmentId: 'appt-1',
+      doctorId: 'doc-1',
+      patientId: 'pat-1',
+      slotId: 'slot-1',
+      appointmentDate: upcomingDates(1)[0],
+      startTime: '10:00:00',
+      endTime: '10:30:00',
+      status: 'PENDING_PAYMENT',
+      paymentStatus: 'PENDING',
+    });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /10:00/ }));
+    // The emergency line is there whatever is ticked.
+    expect(await screen.findByText(/Call 112/)).toBeInTheDocument();
+    await user.type(screen.getByLabelText(/Symptoms/), 'fev');
+    await user.click(screen.getByRole('button', { name: '+ High fever' }));
+    await user.type(screen.getByLabelText(/Symptoms/), 'joint');
+    await user.click(screen.getByRole('button', { name: '+ Joint pain' }));
+    await user.click(screen.getByRole('button', { name: /Confirm booking/ }));
+
+    await waitFor(() =>
+      expect(appointments.book).toHaveBeenCalledWith(
+        expect.objectContaining({ symptoms: ['high_fever', 'joint_pain'] }),
+      ),
     );
   });
 });

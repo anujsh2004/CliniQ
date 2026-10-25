@@ -21,7 +21,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
     @EntityGraph(attributePaths = {"doctor", "slot"})
     Page<Appointment> findByPatientIdOrderByCreatedAtDesc(UUID patientId, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"patient", "patient.user", "slot"})
+    @EntityGraph(attributePaths = {"patient", "patient.user", "slot", "symptoms"})
     @Query("""
             SELECT a FROM Appointment a
              WHERE a.doctor.id = :doctorId

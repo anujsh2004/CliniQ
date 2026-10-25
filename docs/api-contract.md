@@ -722,6 +722,21 @@ Response:
 when the ML service is off or failing, and on appointments that already have an
 outcome, so a v1.5 client reads the response unchanged.
 
+Also added in v1.6 and optional, see section 27: `symptoms`, the codes the
+patient reported when booking, and `conditionHints`:
+
+```json
+"symptoms": ["high_fever", "joint_pain"],
+"conditionHints": {
+  "modelVersion": "conditions-logistic-202610260000",
+  "conditions": [
+    { "name": "Dengue", "probability": 0.62 },
+    { "name": "Chicken pox", "probability": 0.11 },
+    { "name": "Malaria", "probability": 0.08 }
+  ]
+}
+```
+
 ### PATCH /api/v1/appointments/{appointmentId}/complete
 
 Response:
@@ -1037,7 +1052,11 @@ or advise. The speech models are CC-BY-NC and must be replaced before sale
 Version 1.6 adds no-show risk (section 26): an optional `noShowRisk` on each
 appointment in a doctor's daily list, from a self-hosted model that is off by
 default. It also adds `PATCH /appointments/{id}/no-show`, without which no
-appointment could ever reach `NO_SHOW`. Both are additive.
+appointment could ever reach `NO_SHOW`.
+
+It also adds condition hints (section 27): an optional `symptoms` list on
+`POST /appointments`, `GET /symptoms` for the vocabulary, and `symptoms` plus
+`conditionHints` on the doctor's daily list. All of it is additive.
 
 ### 23b. Version 1.2 Change Log
 
@@ -1165,6 +1184,49 @@ Trained on the public Kaggle *Medical Appointment No Shows* dataset (Brazil,
 2016, CC BY-NC-SA). That population is not CliniQ's, so the numbers are a
 starting point to be retrained on CliniQ's own outcomes. Tracked as decision
 D29.
+
+## 27. Condition hints (v1.6)
+
+A patient may tick symptoms when booking. The treating doctor sees them on
+their schedule, with the three conditions the symptoms most resemble, so they
+can prepare before the visit. The model runs in `ml-service/`; symptoms never
+leave the clinic's hardware.
+
+**Never shown to the patient.** The patient sees only what they ticked and a
+fixed emergency notice. CliniQ does not tell a patient what they might have:
+the assistant and voice refuse medical questions for the same reason.
+
+### Booking — POST /api/v1/appointments
+
+`symptoms` is optional: up to 20 codes from `GET /symptoms`, each matching
+`[a-z0-9_]{1,60}`. Only the format is checked, so booking never depends on the
+ML service; a code the model does not know is stored and gives no hint.
+
+### Vocabulary — GET /api/v1/symptoms
+
+```json
+{ "success": true, "data": { "symptoms": [ { "code": "skin_rash", "label": "Skin rash" } ] } }
+```
+
+Authenticated. **Present only when `clinic.ml.enabled` is true**; otherwise a
+404, and the booking page shows no picker. `503` when enabled but the service
+is not answering.
+
+### On the schedule
+
+`symptoms` appears whenever the patient reported any. `conditionHints` appears
+only for a live appointment with **at least two** symptoms the model knows, and
+when the ML service answers in time. With one symptom any ranking is mostly the
+model's prior, so it gives none.
+
+### Where it comes from
+
+Logistic regression trained on the Kaggle *Disease Prediction Using Machine
+Learning* dataset (kaushil268, DbCL 1.0): 131 symptoms, 41 conditions. The
+dataset is synthetic and its 4,920 rows are only 305 distinct cases, so it says
+nothing about real prevalence. Measured on held-out cases, the right condition
+is in the top three 99% of the time with half the symptoms hidden, and 89% with
+only two. Real patients will do worse. Tracked as decision D30.
 
 ## 24. Versioning
 
