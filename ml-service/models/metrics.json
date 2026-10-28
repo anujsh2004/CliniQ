@@ -1,0 +1,56 @@
+{
+  "version": "gradient_boosting-202610251947",
+  "chosen": "gradient_boosting",
+  "trainedAt": "2026-10-25T19:47:18+00:00",
+  "dataset": "KaggleV2-May-2016.csv",
+  "rows": {
+    "train": 63532,
+    "valid": 20539,
+    "test": 26451
+  },
+  "features": [
+    "lead_days",
+    "appointment_weekday",
+    "booking_hour",
+    "prior_visits",
+    "prior_no_shows",
+    "prior_no_show_rate",
+    "reminder_sent"
+  ],
+  "thresholds": {
+    "high": 0.35250829917738286,
+    "medium": 0.26989534288930317
+  },
+  "models": {
+    "logistic": {
+      "valid": {
+        "rocAuc": 0.681,
+        "prAuc": 0.3134,
+        "brier": 0.1544
+      },
+      "test": {
+        "rocAuc": 0.6722,
+        "prAuc": 0.2999,
+        "brier": 0.1462
+      }
+    },
+    "gradient_boosting": {
+      "valid": {
+        "rocAuc": 0.7198,
+        "prAuc": 0.3433,
+        "brier": 0.1453
+      },
+      "test": {
+        "rocAuc": 0.7103,
+        "prAuc": 0.3155,
+        "brier": 0.1393
+      }
+    }
+  },
+  "testHighBand": {
+    "highShare": 0.1404,
+    "highNoShowRate": 0.3411,
+    "baseNoShowRate": 0.1846,
+    "lift": 1.85
+  }
+}

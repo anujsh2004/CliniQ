@@ -4,5 +4,6 @@ __pycache__/
 .pytest_cache/
 # The Kaggle CSV is CC BY-NC-SA and is downloaded by hand, never committed.
 data/
-# Trained models are rebuilt from the data by train.py.
-models/
+# Trained models in models/ are committed, so a service can load them without
+# downloading the datasets and retraining. Rebuild them with train.py and
+# train_conditions.py, and commit the result.

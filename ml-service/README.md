@@ -47,6 +47,27 @@ uv venv --python 3.12
 uv pip install -r requirements.txt
 ```
 
+## Trained models are included
+
+Both trained models are committed in `models/`, so the service runs straight
+after setup - no dataset download and no training needed:
+
+| File | Model | Version |
+|---|---|---|
+| `models/no_show.joblib` | No-show risk, calibrated gradient boosting | `gradient_boosting-202610251947` |
+| `models/conditions.joblib` | Condition hints, multinomial logistic regression | `conditions-logistic-202610251953` |
+| `models/metrics.json`, `models/conditions_metrics.json` | Evaluation results for each | |
+
+They were saved with scikit-learn 1.9.1, numpy 2.5.4, pandas 3.1.0 and joblib
+1.6.0, which is why `requirements.txt` pins exactly those. A pickled
+scikit-learn model may not load under another version, so upgrade them only
+together with retraining. The model files are pickles: load only ones from this
+repository.
+
+The no-show model is learned from CC BY-NC-SA data, so the same
+non-commercial limit applies to it (decision D29). The datasets themselves stay
+out of git; the steps below are only needed to retrain.
+
 ## The dataset
 
 Download `KaggleV2-May-2016.csv` from

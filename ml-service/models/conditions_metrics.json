@@ -1,0 +1,54 @@
+{
+  "version": "conditions-logistic-202610251953",
+  "chosen": "logistic",
+  "trainedAt": "2026-10-25T19:53:55+00:00",
+  "datasets": [
+    "Training.csv",
+    "Testing.csv"
+  ],
+  "distinctCases": 305,
+  "rows": {
+    "train": 213,
+    "test": 92
+  },
+  "symptoms": 131,
+  "conditions": 41,
+  "models": {
+    "naive_bayes": {
+      "validPartial": {
+        "top1": 0.9454,
+        "top3": 0.987
+      },
+      "testFull": {
+        "top1": 1.0,
+        "top3": 1.0
+      },
+      "testPartial": {
+        "top1": 0.9429,
+        "top3": 0.9918
+      },
+      "testTwoSymptoms": {
+        "top1": 0.6288,
+        "top3": 0.8136
+      }
+    },
+    "logistic": {
+      "validPartial": {
+        "top1": 0.9343,
+        "top3": 0.9898
+      },
+      "testFull": {
+        "top1": 0.9891,
+        "top3": 1.0
+      },
+      "testPartial": {
+        "top1": 0.9418,
+        "top3": 0.9902
+      },
+      "testTwoSymptoms": {
+        "top1": 0.7158,
+        "top3": 0.8946
+      }
+    }
+  }
+}
