@@ -63,7 +63,7 @@ docs/              Binding API contract and supporting engineering docs
 | Website | Vite on :5173 | Vercel |
 | Backend, PostgreSQL, Redis | Docker + Maven | Render |
 | ML service (`ml-service/`) | `uvicorn` on :8002 | Render, as `cliniq-ml` (trained models baked into the image) |
-| Voice (`asr-service/`) | `uvicorn` on :8001 | **Not deployed** |
+| Voice (`asr-service/`) | `uvicorn` on :8001 | Not hosted. Runs on a developer machine and the deployed backend reaches it through a tunnel (see below) |
 | RabbitMQ | Docker | Not provisioned (in-app reminders still work) |
 
 **Why voice is not deployed.** The speech models need about 2.3 GB of memory (IndicConformer,
@@ -72,6 +72,54 @@ would need a paid instance with at least 4 GB. Hosting it on a third-party platf
 would also send patients' audio outside the clinic's own infrastructure, which NFR-9 rules out.
 The backend leaves the voice endpoints switched off (`CLINIC_SPEECH_ENABLED` is false), so the
 site works without them.
+
+### Voice on the deployed site, through a tunnel
+
+For a demonstration, the speech service can keep running on a developer's laptop while the
+deployed backend calls it over a tunnel. Nothing is hosted for it, so **voice works only while
+the laptop is on and both programs below are running.** Everything else on the site works
+without the laptop.
+
+1. Start the speech service and wait for `GET http://localhost:8001/health` to say `UP`
+   (about three minutes on a CPU):
+
+   ```bash
+   cd asr-service
+   .venv/Scripts/python.exe -m uvicorn app:app --port 8001
+   ```
+
+2. Open a tunnel to it. With [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/):
+
+   ```bash
+   cloudflared tunnel --url http://localhost:8001
+   ```
+
+   It prints an address like `https://something-random.trycloudflare.com`.
+
+3. In the Render dashboard, open the `cliniq-backend` service, then *Environment*, and set:
+
+   | Variable | Value |
+   |---|---|
+   | `CLINIC_SPEECH_ENABLED` | `true` |
+   | `CLINIC_SPEECH_URL` | the tunnel address from step 2 |
+
+   Save, and let the service redeploy. Do not add these to `render.yaml`: a tunnel address is
+   not something to commit, and an enabled voice feature with no service behind it is worse than
+   an absent one.
+
+A quick tunnel gets a **new address every time it starts**, so step 3's `CLINIC_SPEECH_URL` has
+to be updated each session. A named tunnel on a free Cloudflare account keeps one fixed address.
+
+**Be aware:**
+
+- The speech service has no password. Anyone who learns the tunnel address can use it, so keep
+  the address private and stop the tunnel when you are not demonstrating.
+- The audio passes through the tunnel provider on its way to the laptop. That is acceptable for
+  a demonstration with no real patients, and not for a clinic's real audio (NFR-9).
+- The first spoken request after the service starts is slow while the models warm up. The
+  backend waits up to 60 seconds for it.
+- Later, the same service can move to a hosted Space or a paid server with at least 4 GB of
+  memory; then only `CLINIC_SPEECH_URL` changes.
 
 **The ML service on a free instance.** It sleeps when idle. The backend waits only 2 seconds for
 it, so the first schedule load after a quiet spell shows no risk badges or condition hints; they

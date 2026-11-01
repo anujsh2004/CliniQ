@@ -1,26 +1,32 @@
 # Voice service
 
-Speech in and speech out for CliniQ, in **Hindi, Tamil and English**. Two
-AI4Bharat models, both MIT licensed, both running entirely on this machine:
+Speech in and speech out for CliniQ, in **Hindi, Tamil and English**, all running
+entirely on this machine:
 
-| Stage | Model | Size | Languages |
-|---|---|---|---|
-| Speech to text | [IndicConformer](https://github.com/AI4Bharat/IndicConformerASR) | 600M | 22 Indian languages + English |
-| Text to speech | [IndicF5](https://huggingface.co/ai4bharat/IndicF5) | 0.4B | 11 Indian languages |
+| Stage | Model | Size | Languages | Licence |
+|---|---|---|---|---|
+| Speech to text | [IndicConformer](https://github.com/AI4Bharat/IndicConformerASR) | 600M | Hindi, Tamil | MIT |
+| Speech to text | [Whisper small](https://huggingface.co/openai/whisper-small) | 244M | English | MIT |
+| Text to speech | [MMS-TTS](https://huggingface.co/facebook/mms-tts-hin) (one small model each for `hin`, `tam`, `eng`) | about 36M each | Hindi, Tamil, English | **CC-BY-NC 4.0** |
 
-IndicF5 does not cover English, so English replies are spoken by the browser
-instead — its English voices are good, instant and free, and paying a GPU to do
-worse would be waste.
+IndicConformer cannot recognise English, so Whisper does that. The text-to-speech
+voices are non-commercial only (decision D28): fine for a demonstration, not for a
+product that is sold. IndicF5 (MIT) was tried first and would not load on this
+stack, and Indic Parler-TTS needs a GPU; see `docs/open-decisions.md`.
+
+The models need about **2.3 GB of memory** while running and several GB of disk for
+the Hugging Face cache, which is why this service is not hosted on Render's free
+plan. See the root `README.md` for running it against the deployed site.
 
 ## Hugging Face access, first
 
-**Both models are gated.** Gating is automatic — there is no approval queue —
-but you must be signed in and have clicked through once:
+**IndicConformer is gated.** Gating is automatic — there is no approval queue —
+but you must be signed in and have clicked through once. Whisper and MMS-TTS are
+not gated.
 
 1. Create a free account at <https://huggingface.co/join>.
-2. Open each model page and accept the terms:
+2. Open the model page and accept the terms:
    - <https://huggingface.co/ai4bharat/indic-conformer-600m-multilingual>
-   - <https://huggingface.co/ai4bharat/IndicF5>
 3. Create a **read** token at <https://huggingface.co/settings/tokens>.
 4. Sign in locally, once:
 
