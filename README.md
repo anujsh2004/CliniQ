@@ -55,3 +55,47 @@ docs/              Binding API contract and supporting engineering docs
   `frontend/vercel.json` proxies `/api/*` to the Render service, so the SPA keeps
   calling its own origin and no CORS setup is needed. If the Render service URL
   differs from `https://cliniq-backend-sjj0.onrender.com`, update the rewrite.
+
+### What runs where
+
+| Part | Local | Deployed (Render + Vercel) |
+|---|---|---|
+| Website | Vite on :5173 | Vercel |
+| Backend, PostgreSQL, Redis | Docker + Maven | Render |
+| ML service (`ml-service/`) | `uvicorn` on :8002 | Render, as `cliniq-ml` (trained models baked into the image) |
+| Voice (`asr-service/`) | `uvicorn` on :8001 | **Not deployed** |
+| RabbitMQ | Docker | Not provisioned (in-app reminders still work) |
+
+**Why voice is not deployed.** The speech models need about 2.3 GB of memory (IndicConformer,
+Whisper and three MMS voices) and a 2.5 GB download, and Render's free instance has 512 MB. It
+would need a paid instance with at least 4 GB. Hosting it on a third-party platform instead
+would also send patients' audio outside the clinic's own infrastructure, which NFR-9 rules out.
+The backend leaves the voice endpoints switched off (`CLINIC_SPEECH_ENABLED` is false), so the
+site works without them.
+
+**The ML service on a free instance.** It sleeps when idle. The backend waits only 2 seconds for
+it, so the first schedule load after a quiet spell shows no risk badges or condition hints; they
+return once the service has woken. This is intended: ML is a hint, never a reason for the
+schedule to fail.
+
+### Demo accounts
+
+Set `CLINIC_DEMO_DATA_ENABLED=true` (the Render blueprint does) and an empty database starts
+with these accounts. They are created only if missing, so an account that already exists is
+never changed, and it is safe on every start.
+
+| Role | Email | Password |
+|---|---|---|
+| Admin | `ramesh@example.com` | `StrongPassword123` |
+| Doctor | `meera@example.com` (Dentist, ₹500) | `StrongPassword123` |
+| Doctor | `arvind@example.com` (General Physician, ₹400) | `StrongPassword123` |
+| Doctor | `kavya@example.com` (Dermatologist, ₹650) | `StrongPassword123` |
+| Patient | `anjali@example.com` | `StrongPassword123` |
+
+Each doctor works Monday to Friday, 09:00 to 17:00, in 30-minute slots, so there is something
+to book straight away. Change the shared password with `CLINIC_DEMO_PASSWORD`.
+
+> **These credentials are public.** Anyone who reads this file can sign in as the administrator.
+> Use them for a demonstration only. Before real patients use the site, set
+> `CLINIC_DEMO_DATA_ENABLED=false`, delete the demo accounts, and change the bootstrap
+> administrator's password.
