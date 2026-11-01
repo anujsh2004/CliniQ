@@ -108,6 +108,14 @@ clinic:
     admin-phone: ${CLINIC_BOOTSTRAP_ADMIN_PHONE:+910000000000}
     admin-password: ${CLINIC_BOOTSTRAP_ADMIN_PASSWORD:}
 
+  demo-data:
+    # Off by default. When on, an administrator, three doctors with weekly
+    # hours and a patient are created if they are missing (see DemoDataSeeder).
+    # They all share one published password, so never turn this on for a clinic
+    # with real patients.
+    enabled: ${CLINIC_DEMO_DATA_ENABLED:false}
+    password: ${CLINIC_DEMO_PASSWORD:StrongPassword123}
+
   notifications:
     # Reminder rules. Change an offset to move when a reminder fires, change a
     # message to change what it says, add an entry for another reminder - all

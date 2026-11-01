@@ -41,3 +41,7 @@ frontend/test-results/
 frontend/blob-report/
 # TypeScript incremental build info
 *.tsbuildinfo
+
+# Database dumps hold real accounts, phone numbers and password hashes; never commit them.
+*.sql
+!clinic-backend/src/main/resources/db/migration/*.sql
