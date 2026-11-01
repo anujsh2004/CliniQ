@@ -15,6 +15,20 @@ services:
     plan: free
     ipAllowList: []
 
+  # The no-show risk and condition-hint models (ml-service/). Small enough for
+  # the free 512 MB instance: the trained models are under 1.5 MB and are baked
+  # into the image. Free services sleep when idle, so the first request after a
+  # quiet spell can miss the backend's short ML timeout and the schedule loads
+  # without badges until the service has woken. That is by design: ML is a hint,
+  # never a reason for the schedule to fail.
+  - type: web
+    name: cliniq-ml
+    runtime: docker
+    plan: free
+    rootDir: ml-service
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+
   - type: web
     name: cliniq-backend
     runtime: docker
@@ -47,6 +61,19 @@ services:
         sync: false
       - key: RABBITMQ_LISTENER_ENABLED
         value: "false"
+      # No-show risk and condition hints, from the cliniq-ml service above.
+      # hostport is its internal host:port; the backend treats a bare host:port
+      # as plain HTTP. If Render's private network does not reach a free
+      # service, set CLINIC_ML_URL by hand to the service's public https URL.
+      - key: CLINIC_ML_ENABLED
+        value: "true"
+      - key: CLINIC_ML_URL
+        fromService: { type: web, name: cliniq-ml, property: hostport }
+      # Creates the demonstration accounts listed in the README on an empty
+      # database. They share one published password: turn this off, or change
+      # CLINIC_DEMO_PASSWORD, before real patients use the site.
+      - key: CLINIC_DEMO_DATA_ENABLED
+        value: "true"
       # The free instance has 512 MB; keep the heap inside it.
       - key: JAVA_TOOL_OPTIONS
         value: -XX:MaxRAMPercentage=75 -XX:+UseSerialGC

@@ -25,10 +25,18 @@ public record MlProperties(
         Duration timeout) {
 
     public MlProperties {
-        baseUrl = baseUrl == null || baseUrl.isBlank() ? "http://localhost:8002" : baseUrl;
+        baseUrl = baseUrl == null || baseUrl.isBlank() ? "http://localhost:8002" : withScheme(baseUrl.trim());
         // Short, unlike speech. Scoring a day is milliseconds of arithmetic, and
         // the schedule waits on it: a slow model must cost the doctor their
         // risk badges, never their schedule.
         timeout = timeout == null ? Duration.ofSeconds(2) : timeout;
+    }
+
+    /**
+     * Render hands a service's internal address over as a bare {@code host:port},
+     * so a missing scheme means plain HTTP on the private network.
+     */
+    private static String withScheme(String url) {
+        return url.startsWith("http://") || url.startsWith("https://") ? url : "http://" + url;
     }
 }
