@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# The Kaggle CSVs are CC BY-NC-SA and never go into an image.
+data/
+tests/

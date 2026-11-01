@@ -55,3 +55,95 @@ docs/              Binding API contract and supporting engineering docs
   `frontend/vercel.json` proxies `/api/*` to the Render service, so the SPA keeps
   calling its own origin and no CORS setup is needed. If the Render service URL
   differs from `https://cliniq-backend-sjj0.onrender.com`, update the rewrite.
+
+### What runs where
+
+| Part | Local | Deployed (Render + Vercel) |
+|---|---|---|
+| Website | Vite on :5173 | Vercel |
+| Backend, PostgreSQL, Redis | Docker + Maven | Render |
+| ML service (`ml-service/`) | `uvicorn` on :8002 | Render, as `cliniq-ml` (trained models baked into the image) |
+| Voice (`asr-service/`) | `uvicorn` on :8001 | Not hosted. Runs on a developer machine and the deployed backend reaches it through a tunnel (see below) |
+| RabbitMQ | Docker | Not provisioned (in-app reminders still work) |
+
+**Why voice is not deployed.** The speech models need about 2.3 GB of memory (IndicConformer,
+Whisper and three MMS voices) and a 2.5 GB download, and Render's free instance has 512 MB. It
+would need a paid instance with at least 4 GB. Hosting it on a third-party platform instead
+would also send patients' audio outside the clinic's own infrastructure, which NFR-9 rules out.
+The backend leaves the voice endpoints switched off (`CLINIC_SPEECH_ENABLED` is false), so the
+site works without them.
+
+### Voice on the deployed site, through a tunnel
+
+For a demonstration, the speech service can keep running on a developer's laptop while the
+deployed backend calls it over a tunnel. Nothing is hosted for it, so **voice works only while
+the laptop is on and both programs below are running.** Everything else on the site works
+without the laptop.
+
+1. Start the speech service and wait for `GET http://localhost:8001/health` to say `UP`
+   (about three minutes on a CPU):
+
+   ```bash
+   cd asr-service
+   .venv/Scripts/python.exe -m uvicorn app:app --port 8001
+   ```
+
+2. Open a tunnel to it. With [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/):
+
+   ```bash
+   cloudflared tunnel --url http://localhost:8001
+   ```
+
+   It prints an address like `https://something-random.trycloudflare.com`.
+
+3. In the Render dashboard, open the `cliniq-backend` service, then *Environment*, and set:
+
+   | Variable | Value |
+   |---|---|
+   | `CLINIC_SPEECH_ENABLED` | `true` |
+   | `CLINIC_SPEECH_URL` | the tunnel address from step 2 |
+
+   Save, and let the service redeploy. Do not add these to `render.yaml`: a tunnel address is
+   not something to commit, and an enabled voice feature with no service behind it is worse than
+   an absent one.
+
+A quick tunnel gets a **new address every time it starts**, so step 3's `CLINIC_SPEECH_URL` has
+to be updated each session. A named tunnel on a free Cloudflare account keeps one fixed address.
+
+**Be aware:**
+
+- The speech service has no password. Anyone who learns the tunnel address can use it, so keep
+  the address private and stop the tunnel when you are not demonstrating.
+- The audio passes through the tunnel provider on its way to the laptop. That is acceptable for
+  a demonstration with no real patients, and not for a clinic's real audio (NFR-9).
+- The first spoken request after the service starts is slow while the models warm up. The
+  backend waits up to 60 seconds for it.
+- Later, the same service can move to a hosted Space or a paid server with at least 4 GB of
+  memory; then only `CLINIC_SPEECH_URL` changes.
+
+**The ML service on a free instance.** It sleeps when idle. The backend waits only 2 seconds for
+it, so the first schedule load after a quiet spell shows no risk badges or condition hints; they
+return once the service has woken. This is intended: ML is a hint, never a reason for the
+schedule to fail.
+
+### Demo accounts
+
+Set `CLINIC_DEMO_DATA_ENABLED=true` (the Render blueprint does) and an empty database starts
+with these accounts. They are created only if missing, so an account that already exists is
+never changed, and it is safe on every start.
+
+| Role | Email | Password |
+|---|---|---|
+| Admin | `ramesh@example.com` | `StrongPassword123` |
+| Doctor | `meera@example.com` (Dentist, ₹500) | `StrongPassword123` |
+| Doctor | `arvind@example.com` (General Physician, ₹400) | `StrongPassword123` |
+| Doctor | `kavya@example.com` (Dermatologist, ₹650) | `StrongPassword123` |
+| Patient | `anjali@example.com` | `StrongPassword123` |
+
+Each doctor works Monday to Friday, 09:00 to 17:00, in 30-minute slots, so there is something
+to book straight away. Change the shared password with `CLINIC_DEMO_PASSWORD`.
+
+> **These credentials are public.** Anyone who reads this file can sign in as the administrator.
+> Use them for a demonstration only. Before real patients use the site, set
+> `CLINIC_DEMO_DATA_ENABLED=false`, delete the demo accounts, and change the bootstrap
+> administrator's password.
