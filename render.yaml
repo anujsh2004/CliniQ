@@ -62,13 +62,14 @@ services:
       - key: RABBITMQ_LISTENER_ENABLED
         value: "false"
       # No-show risk and condition hints, from the cliniq-ml service above.
-      # hostport is its internal host:port; the backend treats a bare host:port
-      # as plain HTTP. If Render's private network does not reach a free
-      # service, set CLINIC_ML_URL by hand to the service's public https URL.
+      # The public address, not Render's internal host:port: a free web service
+      # does not receive private-network traffic, so the internal address left
+      # every call failing and the schedule without hints. If the service is
+      # ever recreated under another name, update this URL.
       - key: CLINIC_ML_ENABLED
         value: "true"
       - key: CLINIC_ML_URL
-        fromService: { type: web, name: cliniq-ml, property: hostport }
+        value: https://cliniq-ml-v62a.onrender.com
       # Creates the demonstration accounts listed in the README on an empty
       # database. They share one published password: turn this off, or change
       # CLINIC_DEMO_PASSWORD, before real patients use the site.
